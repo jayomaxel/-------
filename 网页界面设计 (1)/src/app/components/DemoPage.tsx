@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Upload,
@@ -18,7 +18,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-type CategoryOption = '楗枡' | '鍙扮伅';
+type CategoryOption = '饮料' | '台灯';
 
 type AnalyzeResponse = {
   features: {
@@ -58,8 +58,8 @@ type RadarDatum = {
 type SuggestionLevel = 'high' | 'medium' | 'low';
 
 const datasetMeta: Record<CategoryOption, { label: string; key: string; count: number }> = {
-  楗枡: { label: '鍔熻兘鎬чギ鏂?, key: '鍔熻兘鎬чギ鏂?, count: 2115 },
-  鍙扮伅: { label: '妗岄潰鍙扮伅', key: '妗岄潰鍙扮伅', count: 2681 },
+  饮料: { label: '功能性饮料', key: '功能性饮料', count: 2115 },
+  台灯: { label: '桌面台灯', key: '桌面台灯', count: 2681 },
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -77,8 +77,8 @@ const formatScore = (value: number) =>
   value <= 1 ? (value * 100).toFixed(1) : value.toFixed(2);
 
 const getSuggestionLevel = (priority: string): SuggestionLevel => {
-  if (priority === '楂?) return 'high';
-  if (priority === '涓?) return 'medium';
+  if (priority === '高') return 'high';
+  if (priority === '中') return 'medium';
   return 'low';
 };
 
@@ -98,7 +98,7 @@ const getSuggestionStyle = (level: SuggestionLevel) => {
       container:
         'bg-red-50 border-red-300 hover:border-red-400 hover:shadow-md',
       badge: 'bg-red-500 text-white',
-      label: '楂?,
+      label: '高',
     };
   }
   if (level === 'medium') {
@@ -106,19 +106,19 @@ const getSuggestionStyle = (level: SuggestionLevel) => {
       container:
         'bg-yellow-50 border-yellow-300 hover:border-yellow-400 hover:shadow-md',
       badge: 'bg-yellow-500 text-white',
-      label: '涓?,
+      label: '中',
     };
   }
   return {
     container:
       'bg-green-50 border-green-300 hover:border-green-400 hover:shadow-md',
     badge: 'bg-green-500 text-white',
-    label: '浣?,
+    label: '低',
   };
 };
 
 export function DemoPage() {
-  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>('楗枡');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>('饮料');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
@@ -146,27 +146,27 @@ export function DemoPage() {
 
     return [
       {
-        feature: '瑙嗚鐔?,
+        feature: '视觉熵',
         value: normalize(result.features.entropy, 10),
         display: formatNumber(result.features.entropy, 2),
       },
       {
-        feature: '鏂囧瓧瀵嗗害',
+        feature: '文字密度',
         value: normalize(result.features.text_density, 1),
         display: formatNumber(result.features.text_density, 2),
       },
       {
-        feature: '浜害',
+        feature: '亮度',
         value: normalize(result.features.brightness, 1),
         display: formatNumber(result.features.brightness, 2),
       },
       {
-        feature: '瀵规瘮搴?,
+        feature: '对比度',
         value: normalize(result.features.contrast, 100),
         display: formatNumber(result.features.contrast, 2),
       },
       {
-        feature: '楗卞拰搴?,
+        feature: '饱和度',
         value: normalize(result.features.saturation, 1),
         display: formatNumber(result.features.saturation, 2),
       },
@@ -193,7 +193,7 @@ export function DemoPage() {
 
   const handleAnalyze = async () => {
     if (!uploadedFile) {
-      setError('璇峰厛涓婁紶鍥剧墖銆?);
+      setError('请先上传图片。');
       return;
     }
 
@@ -205,7 +205,7 @@ export function DemoPage() {
       formData.append('file', uploadedFile);
       formData.append(
         'dataset_key',
-        selectedCategory === '楗枡' ? '鍔熻兘鎬чギ鏂? : '妗岄潰鍙扮伅',
+        selectedCategory === '饮料' ? '功能性饮料' : '桌面台灯',
       );
 
       const res = await fetch('http://localhost:8000/analyze', {
@@ -214,12 +214,12 @@ export function DemoPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error ?? '鍒嗘瀽澶辫触锛岃绋嶅悗鍐嶈瘯銆?);
+        throw new Error(data?.error ?? '分析失败，请稍后再试。');
       }
       setResult(data);
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : '鍒嗘瀽澶辫触锛岃绋嶅悗鍐嶈瘯銆?);
+      setError(err instanceof Error ? err.message : '分析失败，请稍后再试。');
     } finally {
       setLoading(false);
     }
@@ -237,17 +237,18 @@ export function DemoPage() {
       <div className="mx-auto max-w-[1800px] p-6 xl:p-12">
         <div className="mb-10 xl:mb-12">
           <h1 className="mb-3 text-4xl font-black text-gray-900 xl:text-5xl">
-            绯荤粺婕旂ず
+            系统演示
           </h1>
           <p className="text-lg text-gray-600 xl:text-xl">
-            涓婁紶涓诲浘锛岃幏鍙朇TR棰勬祴涓庢櫤鑳借瘖鏂?          </p>
+            上传主图，获取 CTR 预测与智能诊断。
+          </p>
         </div>
 
         <div className="grid gap-8 xl:grid-cols-5">
           <div className="space-y-6 xl:col-span-1">
             <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
               <label className="mb-3 block text-sm font-bold text-gray-700">
-                閫夋嫨鍝佺被
+                选择品类
               </label>
               <select
                 value={selectedCategory}
@@ -258,8 +259,8 @@ export function DemoPage() {
                 }}
                 className="w-full cursor-pointer rounded-lg border-2 border-gray-300 px-4 py-3 font-medium transition-all hover:border-gray-400 focus:border-blue-500 focus:outline-none"
               >
-                <option value="楗枡">鍔熻兘鎬чギ鏂?/option>
-                <option value="鍙扮伅">妗岄潰鍙扮伅</option>
+                <option value="饮料">功能性饮料</option>
+                <option value="台灯">桌面台灯</option>
               </select>
             </div>
 
@@ -279,7 +280,7 @@ export function DemoPage() {
               <div className="flex flex-col items-center gap-4">
                 <Upload size={48} className="text-blue-500" />
                 <div>
-                  <p className="mb-1 font-bold text-gray-800">涓婁紶涓诲浘</p>
+                  <p className="mb-1 font-bold text-gray-800">上传主图</p>
                   <p className="text-sm text-gray-500">
                     {uploadedFile ? uploadedFile.name : 'JPG, PNG'}
                   </p>
@@ -291,7 +292,7 @@ export function DemoPage() {
               {previewUrl ? (
                 <img
                   src={previewUrl}
-                  alt="涓婁紶棰勮"
+                  alt="上传预览"
                   className="size-full object-cover"
                 />
               ) : (
@@ -308,17 +309,17 @@ export function DemoPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 py-4 font-bold text-white shadow-lg transition-all hover:scale-[1.02] hover:from-blue-700 hover:to-cyan-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
             >
               {loading ? <LoaderCircle size={20} className="animate-spin" /> : null}
-              {loading ? '鍒嗘瀽涓?..' : '寮€濮嬪垎鏋?}
+              {loading ? '分析中...' : '开始分析'}
             </button>
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-bold text-gray-600">褰撳墠鏁版嵁闆?/div>
+              <div className="text-sm font-bold text-gray-600">当前数据集</div>
               <div className="mt-2 text-2xl font-black text-gray-900">
                 {currentDataset.count}
               </div>
               <p className="mt-1 text-sm text-gray-600">{currentDataset.label}</p>
               <p className="mt-1 text-xs font-medium text-gray-500">
-                鍓嶇 localhost:5173 路 鎺ュ彛 localhost:8000
+                前端 localhost:5173 · 接口 localhost:8000
               </p>
             </div>
 
@@ -339,17 +340,17 @@ export function DemoPage() {
               <div className="flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <div className="mb-2 text-sm font-bold text-gray-600">
-                    CTR棰勬祴璇勫垎
+                    CTR预测评分
                   </div>
                   <div className="text-7xl font-black text-blue-600 xl:text-9xl">
                     {scoreDisplay}
                   </div>
                   <p className="mt-4 text-lg text-gray-600 xl:text-xl">
-                    瓒呰繃 <span className="font-bold text-green-600">{percentile}%</span>{' '}
-                    鍚岀被鍟嗗搧
+                    超过 <span className="font-bold text-green-600">{percentile}%</span>{' '}
+                    同类商品
                   </p>
                   <p className="mt-2 text-sm font-medium text-gray-500">
-                    鍘熷棰勬祴鍊?{rawScore}
+                    原始预测值: {rawScore}
                   </p>
                 </div>
 
@@ -396,7 +397,7 @@ export function DemoPage() {
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
                 <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-800">
                   <TrendingUp size={24} className="text-blue-600" />
-                  瑙嗚鐗瑰緛鍒嗘瀽
+                  视觉特征分析
                 </h3>
 
                 <div className="h-80">
@@ -407,7 +408,7 @@ export function DemoPage() {
                         <PolarAngleAxis dataKey="feature" stroke="#374151" />
                         <PolarRadiusAxis domain={[0, 100]} stroke="#6b7280" />
                         <Radar
-                          name="鐗瑰緛鍊?
+                          name="特征值"
                           dataKey="value"
                           stroke="#2563eb"
                           fill="#2563eb"
@@ -417,7 +418,7 @@ export function DemoPage() {
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex size-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-sm font-medium text-gray-500">
-                      鍒嗘瀽瀹屾垚鍚庢樉绀洪浄杈惧浘
+                      分析完成后显示雷达图
                     </div>
                   )}
                 </div>
@@ -426,11 +427,11 @@ export function DemoPage() {
                   {(radarData.length
                     ? radarData
                     : [
-                        { feature: '瑙嗚鐔?, value: 0, display: '--' },
-                        { feature: '鏂囧瓧瀵嗗害', value: 0, display: '--' },
-                        { feature: '浜害', value: 0, display: '--' },
-                        { feature: '瀵规瘮搴?, value: 0, display: '--' },
-                        { feature: '楗卞拰搴?, value: 0, display: '--' },
+                        { feature: '视觉熵', value: 0, display: '--' },
+                        { feature: '文字密度', value: 0, display: '--' },
+                        { feature: '亮度', value: 0, display: '--' },
+                        { feature: '对比度', value: 0, display: '--' },
+                        { feature: '饱和度', value: 0, display: '--' },
                       ]
                   ).map((item) => (
                     <div key={item.feature} className="text-center">
@@ -447,17 +448,18 @@ export function DemoPage() {
 
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
                 <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                  閬尅鐑姏鍥惧垎鏋?                </h3>
+                  遮挡热力图分析
+                </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="mb-3 text-sm font-bold text-gray-600">
-                      鍘熷鍥惧儚
+                      原始图像
                     </div>
                     <div className="aspect-square overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-300">
                       {previewUrl ? (
                         <img
                           src={previewUrl}
-                          alt="鍘熷鍥惧儚"
+                          alt="原始图像"
                           className="size-full object-cover"
                         />
                       ) : (
@@ -469,12 +471,13 @@ export function DemoPage() {
                   </div>
                   <div>
                     <div className="mb-3 text-sm font-bold text-gray-600">
-                      CTR璐＄尞鐑姏鍥?                    </div>
+                      CTR贡献热力图
+                    </div>
                     <div className="aspect-square overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-300">
                       {result?.heatmap_base64 ? (
                         <img
                           src={asImageSrc(result.heatmap_base64)}
-                          alt="CTR鐑姏鍥?
+                          alt="CTR热力图"
                           className="size-full object-cover"
                         />
                       ) : (
@@ -483,15 +486,15 @@ export function DemoPage() {
                             <div className="flex items-center justify-center gap-2 text-xs font-bold">
                               <div className="flex items-center gap-1">
                                 <div className="h-4 w-4 rounded border border-gray-400 bg-red-500 shadow-sm" />
-                                <span>楂?/span>
+                                <span>高</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <div className="h-4 w-4 rounded border border-gray-400 bg-yellow-500 shadow-sm" />
-                                <span>涓?/span>
+                                <span>中</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <div className="h-4 w-4 rounded border border-gray-400 bg-green-500 shadow-sm" />
-                                <span>浣?/span>
+                                <span>低</span>
                               </div>
                             </div>
                           </div>
@@ -505,14 +508,14 @@ export function DemoPage() {
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
               <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                Top 5 鐩镐技鐖嗘
+                Top 5 相似爆款
               </h3>
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
                 {(topProducts.length
                   ? topProducts
                   : Array.from({ length: 5 }, (_, index) => ({
                       rank: index + 1,
-                      img_name: '绛夊緟缁撴灉',
+                      img_name: '等待结果',
                       similarity: 0,
                       relative_ctr: 0,
                       price: 0,
@@ -542,7 +545,7 @@ export function DemoPage() {
                         #{product.rank} {product.img_name}
                       </div>
                       <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">鐩镐技搴?/span>
+                        <span className="text-gray-600">相似度</span>
                         <span className="text-blue-600">
                           {(product.similarity * 100).toFixed(0)}%
                         </span>
@@ -554,9 +557,9 @@ export function DemoPage() {
                         </span>
                       </div>
                       <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">浠锋牸</span>
+                        <span className="text-gray-600">价格</span>
                         <span className="text-gray-800">
-                          楼{formatNumber(product.price, 2)}
+                          ¥{formatNumber(product.price, 2)}
                         </span>
                       </div>
                     </div>
@@ -566,16 +569,17 @@ export function DemoPage() {
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
-              <h3 className="mb-6 text-2xl font-bold text-gray-800">浼樺寲寤鸿</h3>
+              <h3 className="mb-6 text-2xl font-bold text-gray-800">优化建议</h3>
               <div className="space-y-4">
                 {(suggestions.length
                   ? suggestions
                   : [
                       {
-                        priority: '浣?,
-                        category: '绯荤粺鐘舵€?,
-                        issue: '绛夊緟鍒嗘瀽缁撴灉',
-                        suggestion: '涓婁紶鍥剧墖骞剁偣鍑烩€滃紑濮嬪垎鏋愨€濆悗锛屽皢鏄剧ず鍩轰簬妯″瀷鐨勪紭鍖栧缓璁€?,
+                        priority: '低',
+                        category: '系统状态',
+                        issue: '等待分析结果',
+                        suggestion:
+                          '上传图片并点击“开始分析”后，将显示基于模型的优化建议。',
                         level: 'low' as SuggestionLevel,
                       },
                     ]

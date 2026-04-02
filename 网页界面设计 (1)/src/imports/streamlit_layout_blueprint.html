@@ -1,0 +1,157 @@
+
+<style>
+  * { box-sizing: border-box; }
+  .wrap { padding: 1rem 0; font-family: var(--font-sans); }
+  .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .mode-card { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; background: var(--color-background-primary); }
+  .mode-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+  .mode-sub { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 10px; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; margin-bottom: 8px; }
+  .badge-a { background: #B5D4F4; color: #042C53; }
+  .badge-b { background: #9FE1CB; color: #04342C; }
+  .page-section { margin-bottom: 20px; }
+  .page-label { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 8px; letter-spacing: 0.05em; }
+  .page-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .pg { border-radius: var(--border-radius-md); padding: 10px 14px; font-size: 12px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-secondary); cursor: pointer; transition: all .15s; min-width: 110px; }
+  .pg:hover { background: var(--color-background-primary); color: var(--color-text-primary); }
+  .pg.active { background: var(--color-background-primary); color: var(--color-text-primary); border-color: var(--color-border-primary); }
+  .pg-title { font-weight: 500; font-size: 13px; color: inherit; }
+  .pg-sub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+
+  .detail { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; background: var(--color-background-primary); margin-top: 16px; }
+  .detail-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .block-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .block { border-radius: var(--border-radius-md); padding: 8px 12px; font-size: 12px; border-left: 3px solid; }
+  .block-title { font-weight: 500; font-size: 12px; margin-bottom: 2px; }
+  .block-desc { font-size: 11px; color: var(--color-text-secondary); }
+  .b-blue  { border-color: #378ADD; background: #E6F1FB; color: #0C447C; }
+  .b-teal  { border-color: #1D9E75; background: #E1F5EE; color: #085041; }
+  .b-amber { border-color: #BA7517; background: #FAEEDA; color: #633806; }
+  .b-coral { border-color: #993C1D; background: #FAECE7; color: #712B13; }
+  .b-purple{ border-color: #534AB7; background: #EEEDFE; color: #3C3489; }
+  .b-gray  { border-color: #5F5E5A; background: #F1EFE8; color: #444441; }
+
+  .sidebar-mock { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px; font-size: 12px; color: var(--color-text-secondary); margin-top: 8px; }
+  .sb-item { padding: 4px 8px; border-radius: 4px; margin-bottom: 2px; cursor: pointer; }
+  .sb-item:hover { background: var(--color-background-primary); color: var(--color-text-primary); }
+  .sb-item.active { background: var(--color-background-primary); color: var(--color-text-primary); font-weight: 500; }
+  .sb-divider { height: 0.5px; background: var(--color-border-tertiary); margin: 6px 0; }
+  .note { font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px 12px; margin-top: 8px; border-left: 3px solid #378ADD; }
+</style>
+
+<div class="wrap">
+
+  <div class="mode-row">
+    <div class="mode-card">
+      <span class="badge badge-a">演示模式</span>
+      <div class="mode-title">现场答辩 / 大屏投影</div>
+      <div class="mode-sub">视觉冲击优先，操作路径极简，评委3步内看到核心结果</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);">侧边栏只显示：品类选择 + 上传图片 + 开始分析</div>
+      <div class="sidebar-mock">
+        <div class="sb-item active">📊 演示模式</div>
+        <div class="sb-divider"></div>
+        <div class="sb-item" style="font-size:11px;">品类：功能性饮料 ▾</div>
+        <div class="sb-item" style="font-size:11px;">上传主图...</div>
+        <div class="sb-item" style="font-size:11px;background:var(--color-background-info);color:var(--color-text-info);border-radius:4px;">▶ 开始分析</div>
+      </div>
+    </div>
+    <div class="mode-card">
+      <span class="badge badge-b">完整模式</span>
+      <div class="mode-title">在线提交 / 评委自查</div>
+      <div class="mode-sub">信息完整，多页导航，每个模块独立可读</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);">侧边栏展开全部页面导航</div>
+      <div class="sidebar-mock">
+        <div class="sb-item active">🏠 项目概览</div>
+        <div class="sb-item">🔬 系统演示</div>
+        <div class="sb-item">📈 模型验证</div>
+        <div class="sb-item">🗂 数据集概览</div>
+        <div class="sb-item">📖 研究背景</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-section">
+    <div class="page-label">完整模式 — 五个页面结构</div>
+    <div class="page-row" id="tabs">
+      <div class="pg active" onclick="show(0)"><div class="pg-title">🏠 项目概览</div><div class="pg-sub">首页 / 入口</div></div>
+      <div class="pg" onclick="show(1)"><div class="pg-title">🔬 系统演示</div><div class="pg-sub">核心功能</div></div>
+      <div class="pg" onclick="show(2)"><div class="pg-title">📈 模型验证</div><div class="pg-sub">实验结果</div></div>
+      <div class="pg" onclick="show(3)"><div class="pg-title">🗂 数据集</div><div class="pg-sub">品类概览</div></div>
+      <div class="pg" onclick="show(4)"><div class="pg-title">📖 研究背景</div><div class="pg-sub">方法论</div></div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail-box"></div>
+
+</div>
+
+<script>
+const pages = [
+  {
+    title: "🏠 页面一：项目概览（首页）",
+    blocks: [
+      { cls: "b-blue",   title: "研究标题 + 一句话定位", desc: "「神经营销学视角下的电商主图CTR智能诊断系统」，副标题说明核心价值" },
+      { cls: "b-teal",   title: "三大核心能力卡片", desc: "视觉特征提取 / CTR预测 / 可解释热力图 — 三列横排，图标+数字+简介" },
+      { cls: "b-amber",  title: "数据集规模一览", desc: "功能性饮料 2115张 / 桌面台灯 2681张，两个大数字卡片并排" },
+      { cls: "b-coral",  title: "核心指标亮点", desc: "同品类 Pearson r=0.5952 突出显示，跨品类对比说明研究边界" },
+      { cls: "b-purple", title: "技术栈说明", desc: "CLIP + XGBoost + Occlusion Sensitivity，简洁图标行" },
+      { cls: "b-gray",   title: "导航引导按钮", desc: "「立即体验系统演示 →」大按钮，引导评委进入系统演示页" },
+    ]
+  },
+  {
+    title: "🔬 页面二：系统演示（核心页）",
+    blocks: [
+      { cls: "b-blue",   title: "左栏：上传区 + 品类选择", desc: "文件上传组件 + 品类下拉（饮料/台灯），上传后立即预览，宽度约1/3" },
+      { cls: "b-teal",   title: "右栏顶部：CTR预测大仪表盘", desc: "大圆形评分 + 百分位进度条 + 「超过XX%同类商品」文案，视觉冲击最强" },
+      { cls: "b-amber",  title: "右栏中部：视觉特征五维雷达图", desc: "entropy/text_density展示，配合数值卡片，替代纯数字展示" },
+      { cls: "b-coral",  title: "右栏下部：热力图双图对比", desc: "原图 | 遮挡热力图 左右并排，色彩图例说明红色=高贡献区域" },
+      { cls: "b-purple", title: "底部：Top5相似爆款", desc: "横向卡片列，每张含缩略图+相似度+CTR+价格，可点击查看大图" },
+      { cls: "b-gray",   title: "底部：优化建议分级", desc: "高/中/低三色卡片，每条建议一句话，右侧诊断概览雷达图" },
+    ]
+  },
+  {
+    title: "📈 页面三：模型验证",
+    blocks: [
+      { cls: "b-blue",   title: "指标总览四格卡片", desc: "同品类 r=0.5952 / MSE / MAE / 跨品类 r=0.015，四个metric card" },
+      { cls: "b-teal",   title: "预测值vs真实值散点图", desc: "同品类散点图（有正相关趋势）vs 跨品类散点图（云团状），对比说明" },
+      { cls: "b-amber",  title: "误差分布直方图", desc: "同品类误差集中在[-50,50] vs 跨品类误差分布宽且有偏，两图并排" },
+      { cls: "b-coral",  title: "典型案例对比", desc: "drink_1954.jpg（高CTR）vs drink_2104.jpg（低CTR），图+特征值+预测值" },
+      { cls: "b-purple", title: "跨品类泛化分析", desc: "饮料→台灯迁移失效的原因解释，图文结合，这是论文亮点" },
+      { cls: "b-gray",   title: "特征重要性分析", desc: "XGBoost feature importance，显示entropy/text_density/clip各维度权重" },
+    ]
+  },
+  {
+    title: "🗂 页面四：数据集概览",
+    blocks: [
+      { cls: "b-blue",   title: "品类切换标签页", desc: "Tab切换：功能性饮料 / 桌面台灯，各自独立展示" },
+      { cls: "b-teal",   title: "数据集基本统计", desc: "样本量、CTR分布直方图、价格分布、销量分布，2×2四格图" },
+      { cls: "b-amber",  title: "CTR分布可视化", desc: "高CTR vs 低CTR样本的视觉熵/文字密度箱线图对比，直观说明特征判别力" },
+      { cls: "b-coral",  title: "样本图片抽样展示", desc: "随机抽取高CTR和低CTR各8张，图片网格展示，直观感受数据" },
+      { cls: "b-purple", title: "特征相关性热力图", desc: "entropy/text_density/price与CTR的相关系数矩阵" },
+      { cls: "b-gray",   title: "数据采集说明", desc: "京东/天猫来源、采集时间、清洗规则简述" },
+    ]
+  },
+  {
+    title: "📖 页面五：研究背景与方法论",
+    blocks: [
+      { cls: "b-blue",   title: "研究动机", desc: "神经营销学背景，电商主图决策的研究价值，一段话+关键数据支撑" },
+      { cls: "b-teal",   title: "技术路线图", desc: "数据采集→特征提取→CTR预测→可解释热力图→优化建议，流程图" },
+      { cls: "b-amber",  title: "三类特征说明", desc: "视觉熵/文字密度/CLIP语义，配公式和直觉解释，非技术评委也能看懂" },
+      { cls: "b-coral",  title: "Occlusion Sensitivity方法说明", desc: "动态示意图说明遮挡思路，为何不用Grad-CAM的一句话解释" },
+      { cls: "b-purple", title: "方法论贡献说明", desc: "「本研究提供的是可复用框架而非单一模型」，呼应跨品类泛化结论" },
+      { cls: "b-gray",   title: "参考文献 / 致谢", desc: "精简版引用，团队分工说明" },
+    ]
+  }
+];
+
+function show(i) {
+  document.querySelectorAll('.pg').forEach((el,j) => el.classList.toggle('active', i===j));
+  const p = pages[i];
+  const box = document.getElementById('detail-box');
+  box.innerHTML = `<div class="detail-title">${p.title}</div><div class="block-grid">${
+    p.blocks.map(b => `<div class="block ${b.cls}"><div class="block-title">${b.title}</div><div class="block-desc">${b.desc}</div></div>`).join('')
+  }</div>`;
+}
+show(0);
+</script>
