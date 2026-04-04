@@ -1,37 +1,13 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { AdviceList } from '../../components/AdviceList';
+import { FeaturePanel } from '../../components/FeaturePanel';
+import { HeatmapOverlay } from '../../components/HeatmapOverlay';
+import { SimilarList } from '../../components/SimilarList';
+import { useAnalyze } from '../../hooks/useAnalyze';
 
 declare const window: Window & {
   Chart?: any;
   lucide?: { createIcons: () => void };
-};
-
-type AnalyzeResponse = {
-  features: {
-    entropy: number;
-    text_density: number;
-    brightness: number;
-    contrast: number;
-    saturation: number;
-  };
-  ctr: {
-    score: number;
-    percentile: number;
-  };
-  heatmap_base64: string;
-  similar: Array<{
-    rank: number;
-    img_name: string;
-    similarity: number;
-    relative_ctr: number;
-    price: number;
-    img_base64: string | null;
-  }>;
-  advice: Array<{
-    priority: string;
-    category: string;
-    issue: string;
-    suggestion: string;
-  }>;
 };
 
 type RadarDatum = {
@@ -40,7 +16,7 @@ type RadarDatum = {
   display: string;
 };
 
-type SuggestionLevel = 'high' | 'medium' | 'low';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000';
 
 const TEXT = {
   modelSummary: '\u7edf\u4e00\u591a\u54c1\u7c7b\u6a21\u578b',
@@ -54,7 +30,6 @@ const TEXT = {
   featureContrast: '\u5bf9\u6bd4\u5ea6',
   featureSaturation: '\u9971\u548c\u5ea6',
   pleaseUpload: '\u8bf7\u5148\u4e0a\u4f20\u56fe\u7247\u3002',
-  analyzeFailed: '\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
   pageTitle: '\u7cfb\u7edf\u6f14\u793a',
   pageSubtitle:
     '\u4e0a\u4f20\u4e3b\u56fe\uff0c\u4f7f\u7528\u7edf\u4e00\u6a21\u578b\u83b7\u53d6 CTR \u9884\u6d4b\u4e0e\u667a\u80fd\u8bca\u65ad\u3002',
@@ -63,8 +38,8 @@ const TEXT = {
   startAnalyze: '\u5f00\u59cb\u5206\u6790',
   analyzing: '\u5206\u6790\u4e2d...',
   modelStatus: '\u6a21\u578b\u72b6\u6001',
-  modelEndpoint:
-    '\u524d\u7aef localhost:5173 \u00b7 \u63a5\u53e3 localhost:8000',
+  modelEndpointPrefix:
+    '\u524d\u7aef localhost:5173 \u00b7 \u63a5\u53e3 ',
   ctrPredictionScore: 'CTR\u9884\u6d4b\u8bc4\u5206',
   exceeds: '\u8d85\u8fc7',
   referenceSamples: '\u53c2\u8003\u6837\u672c',
@@ -75,13 +50,7 @@ const TEXT = {
   occlusionHeatmapAnalysis: '\u906e\u6321\u70ed\u529b\u56fe\u5206\u6790',
   originalImage: '\u539f\u59cb\u56fe\u50cf',
   originalImageAlt: '\u539f\u59cb\u56fe\u50cf',
-  ctrHeatmapContribution: 'CTR\u8d21\u732e\u70ed\u529b\u56fe',
-  ctrHeatmapAlt: 'CTR\u70ed\u529b\u56fe',
-  topProducts: 'Top 5 \u76f8\u4f3c\u7206\u6b3e',
   waitingResult: '\u7b49\u5f85\u7ed3\u679c',
-  similarity: '\u76f8\u4f3c\u5ea6',
-  price: '\u4ef7\u683c',
-  optimizationAdvice: '\u4f18\u5316\u5efa\u8bae',
   systemStatus: '\u7cfb\u7edf\u72b6\u6001',
   waitingAnalysisResult: '\u7b49\u5f85\u5206\u6790\u7ed3\u679c',
   waitingAdvice:
@@ -101,84 +70,17 @@ const clamp = (value: number, min: number, max: number) =>
 
 const normalize = (value: number, max: number) => clamp((value / max) * 100, 0, 100);
 
-const asImageSrc = (base64?: string | null) =>
-  base64 ? `data:image/png;base64,${base64}` : '';
-
 const formatNumber = (value: number, digits = 2) =>
   Number(value ?? 0).toFixed(digits);
 
 const formatScore = (value: number) =>
   value <= 1 ? (value * 100).toFixed(1) : value.toFixed(2);
 
-const getSuggestionLevel = (priority: string): SuggestionLevel => {
-  if (priority === TEXT.high) return 'high';
-  if (priority === TEXT.medium) return 'medium';
-  return 'low';
-};
-
-const getSuggestionIcon = (level: SuggestionLevel) => {
-  if (level === 'high') {
-    return (
-      <i
-        data-lucide="arrow-up"
-        className="mt-1 shrink-0 text-gray-600"
-        style={{ width: 24, height: 24 }}
-      />
-    );
-  }
-
-  if (level === 'medium') {
-    return (
-      <i
-        data-lucide="arrow-down"
-        className="mt-1 shrink-0 text-gray-600"
-        style={{ width: 24, height: 24 }}
-      />
-    );
-  }
-
-  return (
-    <i
-      data-lucide="minus"
-      className="mt-1 shrink-0 text-gray-600"
-      style={{ width: 24, height: 24 }}
-    />
-  );
-};
-
-const getSuggestionStyle = (level: SuggestionLevel) => {
-  if (level === 'high') {
-    return {
-      container:
-        'bg-red-50 border-red-300 hover:border-red-400 hover:shadow-md',
-      badge: 'bg-red-500 text-white',
-      label: TEXT.high,
-    };
-  }
-
-  if (level === 'medium') {
-    return {
-      container:
-        'bg-yellow-50 border-yellow-300 hover:border-yellow-400 hover:shadow-md',
-      badge: 'bg-yellow-500 text-white',
-      label: TEXT.medium,
-    };
-  }
-
-  return {
-    container:
-      'bg-green-50 border-green-300 hover:border-green-400 hover:shadow-md',
-    badge: 'bg-green-500 text-white',
-    label: TEXT.low,
-  };
-};
-
 export function DemoPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [result, setResult] = useState<AnalyzeResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const { result, loading, error, analyze, reset } = useAnalyze();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const radarCanvasRef = useRef<HTMLCanvasElement>(null);
   const radarChartRef = useRef<any>(null);
@@ -234,15 +136,7 @@ export function DemoPage() {
   }, [result]);
 
   const topProducts = result?.similar ?? [];
-
-  const suggestions = useMemo(
-    () =>
-      (result?.advice ?? []).map((item) => ({
-        ...item,
-        level: getSuggestionLevel(item.priority),
-      })),
-    [result],
-  );
+  const suggestions = result?.advice ?? [];
 
   useEffect(() => {
     if (!radarData.length || !radarCanvasRef.current) return;
@@ -290,42 +184,28 @@ export function DemoPage() {
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
-    setUploadedFile(nextFile);
-    setResult(null);
-    setError('');
-  };
 
-  const handleAnalyze = async () => {
-    if (!uploadedFile) {
-      setError(TEXT.pleaseUpload);
+    if (!nextFile) {
       return;
     }
 
-    setLoading(true);
-    setError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-
-      const res = await fetch('http://localhost:8000/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error ?? TEXT.analyzeFailed);
-      }
-
-      setResult(data);
-    } catch (err) {
-      setResult(null);
-      setError(err instanceof Error ? err.message : TEXT.analyzeFailed);
-    } finally {
-      setLoading(false);
-    }
+    setUploadError(null);
+    reset();
+    setUploadedFile(nextFile);
+    void analyze(nextFile);
   };
+
+  const handleAnalyze = () => {
+    if (!uploadedFile) {
+      setUploadError(TEXT.pleaseUpload);
+      return;
+    }
+
+    setUploadError(null);
+    void analyze(uploadedFile);
+  };
+
+  const displayError = uploadError ?? error;
 
   const scoreDisplay = result ? formatScore(result.ctr.score) : '--';
   const rawScore = result ? formatNumber(result.ctr.score, 4) : '--';
@@ -415,13 +295,14 @@ export function DemoPage() {
               </div>
               <p className="mt-1 text-sm text-gray-600">{TEXT.modelNote}</p>
               <p className="mt-1 text-xs font-medium text-gray-500">
-                {TEXT.modelEndpoint}
+                {TEXT.modelEndpointPrefix}
+                {API_BASE}
               </p>
             </div>
 
-            {error ? (
+            {displayError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                {error}
+                {displayError}
               </div>
             ) : null}
           </div>
@@ -509,18 +390,22 @@ export function DemoPage() {
                   )}
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-4 border-t-2 border-black pt-6 xl:grid-cols-5">
-                  {(radarData.length ? radarData : EMPTY_RADAR_DATA).map((item) => (
-                    <div key={item.feature} className="text-center">
-                      <div className="text-3xl font-black text-blue-600">
-                        {item.display}
+                {result ? (
+                  <FeaturePanel features={result.features} ctr={result.ctr} />
+                ) : (
+                  <div className="mt-6 grid grid-cols-2 gap-4 border-t-2 border-black pt-6 xl:grid-cols-5">
+                    {EMPTY_RADAR_DATA.map((item) => (
+                      <div key={item.feature} className="text-center">
+                        <div className="text-3xl font-black text-blue-600">
+                          {item.display}
+                        </div>
+                        <div className="mt-1 text-xs font-medium text-gray-600">
+                          {item.feature}
+                        </div>
                       </div>
-                      <div className="mt-1 text-xs font-medium text-gray-600">
-                        {item.feature}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
@@ -552,17 +437,16 @@ export function DemoPage() {
                   </div>
                   <div>
                     <div className="mb-3 text-sm font-bold text-gray-600">
-                      {TEXT.ctrHeatmapContribution}
+                      热力图叠加预览
                     </div>
-                    <div className="aspect-square overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-300">
-                      {result?.heatmap_base64 ? (
-                        <img
-                          src={asImageSrc(result.heatmap_base64)}
-                          alt={TEXT.ctrHeatmapAlt}
-                          className="size-full object-cover"
+                    <div className="rounded-lg transition-all hover:border-blue-300">
+                      {previewUrl && result?.heatmap_base64 ? (
+                        <HeatmapOverlay
+                          originalPreview={previewUrl}
+                          heatmapBase64={result.heatmap_base64}
                         />
                       ) : (
-                        <div className="flex size-full items-center justify-center bg-gradient-to-br from-red-200 via-yellow-200 to-green-200">
+                        <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-gray-200 bg-gradient-to-br from-red-200 via-yellow-200 to-green-200">
                           <div className="text-center">
                             <div className="flex items-center justify-center gap-2 text-xs font-bold">
                               <div className="flex items-center gap-1">
@@ -588,116 +472,37 @@ export function DemoPage() {
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
-              <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                {TEXT.topProducts}
-              </h3>
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
-                {(topProducts.length
-                  ? topProducts
-                  : Array.from({ length: 5 }, (_, index) => ({
-                      rank: index + 1,
-                      img_name: TEXT.waitingResult,
-                      similarity: 0,
-                      relative_ctr: 0,
-                      price: 0,
-                      img_base64: null,
-                    }))
-                ).map((product) => (
-                  <div
-                    key={`${product.rank}-${product.img_name}`}
-                    className="card-hover cursor-pointer rounded-lg border-2 border-gray-200 p-4 transition-all hover:border-blue-400 hover:shadow-lg"
-                  >
-                    <div className="mb-4 aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                      {product.img_base64 ? (
-                        <img
-                          src={asImageSrc(product.img_base64)}
-                          alt={product.img_name}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center">
-                          <i
-                            data-lucide="image"
-                            className="text-gray-400"
-                            style={{ width: 32, height: 32 }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="truncate text-sm font-bold text-gray-700">
-                        #{product.rank} {product.img_name}
-                      </div>
-                      <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">{TEXT.similarity}</span>
-                        <span className="text-blue-600">
-                          {(product.similarity * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">CTR</span>
-                        <span className="text-green-600">
-                          {formatNumber(product.relative_ctr, 2)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">{TEXT.price}</span>
-                        <span className="text-gray-800">
-                          {'\u00a5'}
-                          {formatNumber(product.price, 2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <SimilarList
+                items={
+                  topProducts.length
+                    ? topProducts
+                    : Array.from({ length: 5 }, (_, index) => ({
+                        rank: index + 1,
+                        img_name: TEXT.waitingResult,
+                        similarity: 0,
+                        relative_ctr: 0,
+                        price: 0,
+                        img_base64: null,
+                      }))
+                }
+              />
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
-              <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                {TEXT.optimizationAdvice}
-              </h3>
-              <div className="space-y-4">
-                {(suggestions.length
-                  ? suggestions
-                  : [
-                      {
-                        priority: TEXT.low,
-                        category: TEXT.systemStatus,
-                        issue: TEXT.waitingAnalysisResult,
-                        suggestion: TEXT.waitingAdvice,
-                        level: 'low' as SuggestionLevel,
-                      },
-                    ]
-                ).map((suggestion, index) => {
-                  const style = getSuggestionStyle(suggestion.level);
-
-                  return (
-                    <div
-                      key={`${suggestion.category}-${index}`}
-                      className={`suggestion-hover flex cursor-pointer items-start gap-4 rounded-xl border-2 p-6 transition-all ${style.container}`}
-                    >
-                      <div
-                        className={`rounded-full px-3 py-1 text-sm font-bold ${style.badge}`}
-                      >
-                        {style.label}
-                      </div>
-                      {getSuggestionIcon(suggestion.level)}
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-800">
-                          {suggestion.category}
-                        </p>
-                        <p className="mt-1 font-medium text-gray-700">
-                          {suggestion.issue}
-                        </p>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {suggestion.suggestion}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <AdviceList
+                items={
+                  suggestions.length
+                    ? suggestions
+                    : [
+                        {
+                          priority: TEXT.low,
+                          category: TEXT.systemStatus,
+                          issue: TEXT.waitingAnalysisResult,
+                          suggestion: TEXT.waitingAdvice,
+                        },
+                      ]
+                }
+              />
             </div>
           </div>
         </div>
