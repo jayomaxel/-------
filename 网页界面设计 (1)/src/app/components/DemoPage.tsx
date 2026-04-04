@@ -18,8 +18,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-type CategoryOption = '饮料' | '台灯';
-
 type AnalyzeResponse = {
   features: {
     entropy: number;
@@ -57,10 +55,8 @@ type RadarDatum = {
 
 type SuggestionLevel = 'high' | 'medium' | 'low';
 
-const datasetMeta: Record<CategoryOption, { label: string; key: string; count: number }> = {
-  饮料: { label: '功能性饮料', key: '功能性饮料', count: 2115 },
-  台灯: { label: '桌面台灯', key: '桌面台灯', count: 2681 },
-};
+const MODEL_SUMMARY = '统一多品类模型';
+const MODEL_NOTE = '6 个品类联合训练';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -118,7 +114,6 @@ const getSuggestionStyle = (level: SuggestionLevel) => {
 };
 
 export function DemoPage() {
-  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>('饮料');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
@@ -136,8 +131,6 @@ export function DemoPage() {
     setPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [uploadedFile]);
-
-  const currentDataset = datasetMeta[selectedCategory];
 
   const radarData = useMemo<RadarDatum[]>(() => {
     if (!result) {
@@ -203,10 +196,6 @@ export function DemoPage() {
     try {
       const formData = new FormData();
       formData.append('file', uploadedFile);
-      formData.append(
-        'dataset_key',
-        selectedCategory === '饮料' ? '功能性饮料' : '桌面台灯',
-      );
 
       const res = await fetch('http://localhost:8000/analyze', {
         method: 'POST',
@@ -240,30 +229,12 @@ export function DemoPage() {
             系统演示
           </h1>
           <p className="text-lg text-gray-600 xl:text-xl">
-            上传主图，获取 CTR 预测与智能诊断。
+            上传主图，使用统一模型获取 CTR 预测与智能诊断。
           </p>
         </div>
 
         <div className="grid gap-8 xl:grid-cols-5">
           <div className="space-y-6 xl:col-span-1">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-              <label className="mb-3 block text-sm font-bold text-gray-700">
-                选择品类
-              </label>
-              <select
-                value={selectedCategory}
-                onChange={(event) => {
-                  setSelectedCategory(event.target.value as CategoryOption);
-                  setResult(null);
-                  setError('');
-                }}
-                className="w-full cursor-pointer rounded-lg border-2 border-gray-300 px-4 py-3 font-medium transition-all hover:border-gray-400 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="饮料">功能性饮料</option>
-                <option value="台灯">桌面台灯</option>
-              </select>
-            </div>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -313,11 +284,11 @@ export function DemoPage() {
             </button>
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-bold text-gray-600">当前数据集</div>
+              <div className="text-sm font-bold text-gray-600">模型状态</div>
               <div className="mt-2 text-2xl font-black text-gray-900">
-                {currentDataset.count}
+                {MODEL_SUMMARY}
               </div>
-              <p className="mt-1 text-sm text-gray-600">{currentDataset.label}</p>
+              <p className="mt-1 text-sm text-gray-600">{MODEL_NOTE}</p>
               <p className="mt-1 text-xs font-medium text-gray-500">
                 前端 localhost:5173 · 接口 localhost:8000
               </p>
@@ -347,7 +318,7 @@ export function DemoPage() {
                   </div>
                   <p className="mt-4 text-lg text-gray-600 xl:text-xl">
                     超过 <span className="font-bold text-green-600">{percentile}%</span>{' '}
-                    同类商品
+                    参考样本
                   </p>
                   <p className="mt-2 text-sm font-medium text-gray-500">
                     原始预测值: {rawScore}

@@ -27,8 +27,8 @@ DATASETS = {
         "img_prefix": DRINK_IMG_PREFIX,
         "sample_size": DRINK_SAMPLE_SIZE,
         "cache_vectors": "cache/drink_clip_vectors.npy",
-        "model_path": "models/drink_xgboost_ctr.pkl",
-        "scaler_path": "models/drink_ctr_scaler.pkl",
+        "model_path": "models/ctr_xgboost_model.pkl",
+        "scaler_path": "models/ctr_feature_scaler.pkl",
     },
     "桌面台灯": {
         "data_dir": LAMP_DATA_DIR,
@@ -38,7 +38,7 @@ DATASETS = {
         "sample_size": LAMP_SAMPLE_SIZE,
         "cache_vectors": "cache/lamp_clip_vectors.npy",
         "model_path": "models/lamp_xgboost_ctr.pkl",
-        "scaler_path": "models/lamp_ctr_scaler.pkl",
+        "scaler_path": "models/lamp_ctr_feature_scaler.pkl",
     },
 }
 
@@ -54,6 +54,7 @@ IMAGES_DIR = DATASETS[DEFAULT_DATASET]["images_dir"]
 CACHE_DIR = "cache"
 CLIP_VECTORS_PATH = DATASETS[DEFAULT_DATASET]["cache_vectors"]
 MODEL_PATH = DATASETS[DEFAULT_DATASET]["model_path"]
+SCALER_PATH = DATASETS[DEFAULT_DATASET]["scaler_path"]
 
 # Image preprocessing
 IMG_SIZE = (224, 224)
@@ -106,4 +107,3 @@ XGB_PARAMS = {
     "random_state": RANDOM_STATE,
     "verbosity": 1,
 }
-

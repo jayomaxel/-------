@@ -8,7 +8,7 @@ from typing import Any
 import cv2
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from PIL import Image
@@ -83,13 +83,12 @@ def _similar_image_to_base64(img_path: str | None) -> str | None:
 
 @app.get('/health')
 def health() -> dict[str, Any]:
-    return {'status': 'ok', 'datasets': list(config.DATASETS.keys())}
+    return {'status': 'ok', 'model_scope': 'global'}
 
 
 @app.post('/analyze')
 async def analyze(
     file: UploadFile = File(...),
-    dataset_key: str = Form('功能性饮料'),
 ) -> Any:
     try:
         file_bytes = await file.read()
@@ -98,11 +97,10 @@ async def analyze(
 
         processed_image = preprocess_image(image_array)
         features = extract_features(processed_image)
-        ctr_score, ctr_percentile = predict_ctr(features, dataset_key)
-        heatmap_array = generate_heatmap(processed_image, dataset_key=dataset_key)
+        ctr_score, ctr_percentile = predict_ctr(features)
+        heatmap_array = generate_heatmap(processed_image)
         similar_items = retrieve_similar(
             features['clip_vector'],
-            dataset_key=dataset_key,
             top_k=config.TOP_K_SIMILAR,
         )
         advice = generate_advice(features, float(ctr_score), int(ctr_percentile))
