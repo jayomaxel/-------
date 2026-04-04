@@ -20,3 +20,29 @@ body {
 img {
   display: block;
 }
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-scale-in {
+  animation: fadeScaleIn 0.5s ease forwards;
+}
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: scale(1.05) translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+}
+
+.suggestion-hover {
+  transition: transform 0.2s ease;
+}
+
+.suggestion-hover:hover {
+  transform: translateX(4px);
+}

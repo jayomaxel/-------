@@ -1,22 +1,9 @@
-﻿import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import {
-  Upload,
-  TrendingUp,
-  Image as ImageIcon,
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  LoaderCircle,
-} from 'lucide-react';
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-} from 'recharts';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+
+declare const window: Window & {
+  Chart?: any;
+  lucide?: { createIcons: () => void };
+};
 
 type AnalyzeResponse = {
   features: {
@@ -55,8 +42,59 @@ type RadarDatum = {
 
 type SuggestionLevel = 'high' | 'medium' | 'low';
 
-const MODEL_SUMMARY = '统一多品类模型';
-const MODEL_NOTE = '6 个品类联合训练';
+const TEXT = {
+  modelSummary: '\u7edf\u4e00\u591a\u54c1\u7c7b\u6a21\u578b',
+  modelNote: '6 \u4e2a\u54c1\u7c7b\u8054\u5408\u8bad\u7ec3',
+  high: '\u9ad8',
+  medium: '\u4e2d',
+  low: '\u4f4e',
+  featureEntropy: '\u89c6\u89c9\u71b5',
+  featureTextDensity: '\u6587\u5b57\u5bc6\u5ea6',
+  featureBrightness: '\u4eae\u5ea6',
+  featureContrast: '\u5bf9\u6bd4\u5ea6',
+  featureSaturation: '\u9971\u548c\u5ea6',
+  pleaseUpload: '\u8bf7\u5148\u4e0a\u4f20\u56fe\u7247\u3002',
+  analyzeFailed: '\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002',
+  pageTitle: '\u7cfb\u7edf\u6f14\u793a',
+  pageSubtitle:
+    '\u4e0a\u4f20\u4e3b\u56fe\uff0c\u4f7f\u7528\u7edf\u4e00\u6a21\u578b\u83b7\u53d6 CTR \u9884\u6d4b\u4e0e\u667a\u80fd\u8bca\u65ad\u3002',
+  uploadPrimary: '\u4e0a\u4f20\u4e3b\u56fe',
+  uploadPreviewAlt: '\u4e0a\u4f20\u9884\u89c8',
+  startAnalyze: '\u5f00\u59cb\u5206\u6790',
+  analyzing: '\u5206\u6790\u4e2d...',
+  modelStatus: '\u6a21\u578b\u72b6\u6001',
+  modelEndpoint:
+    '\u524d\u7aef localhost:5173 \u00b7 \u63a5\u53e3 localhost:8000',
+  ctrPredictionScore: 'CTR\u9884\u6d4b\u8bc4\u5206',
+  exceeds: '\u8d85\u8fc7',
+  referenceSamples: '\u53c2\u8003\u6837\u672c',
+  rawPrediction: '\u539f\u59cb\u9884\u6d4b\u503c',
+  visualFeatureAnalysis: '\u89c6\u89c9\u7279\u5f81\u5206\u6790',
+  showRadarAfterAnalysis:
+    '\u5206\u6790\u5b8c\u6210\u540e\u663e\u793a\u96f7\u8fbe\u56fe',
+  occlusionHeatmapAnalysis: '\u906e\u6321\u70ed\u529b\u56fe\u5206\u6790',
+  originalImage: '\u539f\u59cb\u56fe\u50cf',
+  originalImageAlt: '\u539f\u59cb\u56fe\u50cf',
+  ctrHeatmapContribution: 'CTR\u8d21\u732e\u70ed\u529b\u56fe',
+  ctrHeatmapAlt: 'CTR\u70ed\u529b\u56fe',
+  topProducts: 'Top 5 \u76f8\u4f3c\u7206\u6b3e',
+  waitingResult: '\u7b49\u5f85\u7ed3\u679c',
+  similarity: '\u76f8\u4f3c\u5ea6',
+  price: '\u4ef7\u683c',
+  optimizationAdvice: '\u4f18\u5316\u5efa\u8bae',
+  systemStatus: '\u7cfb\u7edf\u72b6\u6001',
+  waitingAnalysisResult: '\u7b49\u5f85\u5206\u6790\u7ed3\u679c',
+  waitingAdvice:
+    '\u4e0a\u4f20\u56fe\u7247\u5e76\u70b9\u51fb\u201c\u5f00\u59cb\u5206\u6790\u201d\u540e\uff0c\u5c06\u663e\u793a\u57fa\u4e8e\u6a21\u578b\u7684\u4f18\u5316\u5efa\u8bae\u3002',
+} as const;
+
+const EMPTY_RADAR_DATA: RadarDatum[] = [
+  { feature: TEXT.featureEntropy, value: 0, display: '--' },
+  { feature: TEXT.featureTextDensity, value: 0, display: '--' },
+  { feature: TEXT.featureBrightness, value: 0, display: '--' },
+  { feature: TEXT.featureContrast, value: 0, display: '--' },
+  { feature: TEXT.featureSaturation, value: 0, display: '--' },
+];
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -73,19 +111,39 @@ const formatScore = (value: number) =>
   value <= 1 ? (value * 100).toFixed(1) : value.toFixed(2);
 
 const getSuggestionLevel = (priority: string): SuggestionLevel => {
-  if (priority === '高') return 'high';
-  if (priority === '中') return 'medium';
+  if (priority === TEXT.high) return 'high';
+  if (priority === TEXT.medium) return 'medium';
   return 'low';
 };
 
 const getSuggestionIcon = (level: SuggestionLevel) => {
   if (level === 'high') {
-    return <ArrowUp size={24} className="mt-1 shrink-0 text-gray-600" />;
+    return (
+      <i
+        data-lucide="arrow-up"
+        className="mt-1 shrink-0 text-gray-600"
+        style={{ width: 24, height: 24 }}
+      />
+    );
   }
+
   if (level === 'medium') {
-    return <ArrowDown size={24} className="mt-1 shrink-0 text-gray-600" />;
+    return (
+      <i
+        data-lucide="arrow-down"
+        className="mt-1 shrink-0 text-gray-600"
+        style={{ width: 24, height: 24 }}
+      />
+    );
   }
-  return <Minus size={24} className="mt-1 shrink-0 text-gray-600" />;
+
+  return (
+    <i
+      data-lucide="minus"
+      className="mt-1 shrink-0 text-gray-600"
+      style={{ width: 24, height: 24 }}
+    />
+  );
 };
 
 const getSuggestionStyle = (level: SuggestionLevel) => {
@@ -94,22 +152,24 @@ const getSuggestionStyle = (level: SuggestionLevel) => {
       container:
         'bg-red-50 border-red-300 hover:border-red-400 hover:shadow-md',
       badge: 'bg-red-500 text-white',
-      label: '高',
+      label: TEXT.high,
     };
   }
+
   if (level === 'medium') {
     return {
       container:
         'bg-yellow-50 border-yellow-300 hover:border-yellow-400 hover:shadow-md',
       badge: 'bg-yellow-500 text-white',
-      label: '中',
+      label: TEXT.medium,
     };
   }
+
   return {
     container:
       'bg-green-50 border-green-300 hover:border-green-400 hover:shadow-md',
     badge: 'bg-green-500 text-white',
-    label: '低',
+    label: TEXT.low,
   };
 };
 
@@ -120,6 +180,8 @@ export function DemoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const radarCanvasRef = useRef<HTMLCanvasElement>(null);
+  const radarChartRef = useRef<any>(null);
 
   useEffect(() => {
     if (!uploadedFile) {
@@ -129,8 +191,13 @@ export function DemoPage() {
 
     const objectUrl = URL.createObjectURL(uploadedFile);
     setPreviewUrl(objectUrl);
+
     return () => URL.revokeObjectURL(objectUrl);
   }, [uploadedFile]);
+
+  useEffect(() => {
+    window.lucide?.createIcons();
+  });
 
   const radarData = useMemo<RadarDatum[]>(() => {
     if (!result) {
@@ -139,27 +206,27 @@ export function DemoPage() {
 
     return [
       {
-        feature: '视觉熵',
+        feature: TEXT.featureEntropy,
         value: normalize(result.features.entropy, 10),
         display: formatNumber(result.features.entropy, 2),
       },
       {
-        feature: '文字密度',
+        feature: TEXT.featureTextDensity,
         value: normalize(result.features.text_density, 1),
         display: formatNumber(result.features.text_density, 2),
       },
       {
-        feature: '亮度',
+        feature: TEXT.featureBrightness,
         value: normalize(result.features.brightness, 1),
         display: formatNumber(result.features.brightness, 2),
       },
       {
-        feature: '对比度',
+        feature: TEXT.featureContrast,
         value: normalize(result.features.contrast, 100),
         display: formatNumber(result.features.contrast, 2),
       },
       {
-        feature: '饱和度',
+        feature: TEXT.featureSaturation,
         value: normalize(result.features.saturation, 1),
         display: formatNumber(result.features.saturation, 2),
       },
@@ -177,6 +244,50 @@ export function DemoPage() {
     [result],
   );
 
+  useEffect(() => {
+    if (!radarData.length || !radarCanvasRef.current) return;
+
+    radarChartRef.current?.destroy();
+    radarChartRef.current = null;
+
+    const Chart = window.Chart;
+    if (!Chart) return;
+
+    radarChartRef.current = new Chart(radarCanvasRef.current, {
+      type: 'radar',
+      data: {
+        labels: radarData.map((datum) => datum.feature),
+        datasets: [
+          {
+            data: radarData.map((datum) => datum.value),
+            backgroundColor: 'rgba(37,99,235,0.3)',
+            borderColor: '#2563eb',
+            pointBackgroundColor: '#2563eb',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0,
+            max: 100,
+            grid: { color: '#d1d5db' },
+            ticks: { display: false },
+            pointLabels: { color: '#374151', font: { size: 12 } },
+          },
+        },
+        plugins: { legend: { display: false } },
+      },
+    });
+
+    return () => {
+      radarChartRef.current?.destroy();
+      radarChartRef.current = null;
+    };
+  }, [radarData]);
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
     setUploadedFile(nextFile);
@@ -186,7 +297,7 @@ export function DemoPage() {
 
   const handleAnalyze = async () => {
     if (!uploadedFile) {
-      setError('请先上传图片。');
+      setError(TEXT.pleaseUpload);
       return;
     }
 
@@ -202,13 +313,15 @@ export function DemoPage() {
         body: formData,
       });
       const data = await res.json();
+
       if (!res.ok) {
-        throw new Error(data?.error ?? '分析失败，请稍后再试。');
+        throw new Error(data?.error ?? TEXT.analyzeFailed);
       }
+
       setResult(data);
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : '分析失败，请稍后再试。');
+      setError(err instanceof Error ? err.message : TEXT.analyzeFailed);
     } finally {
       setLoading(false);
     }
@@ -226,11 +339,9 @@ export function DemoPage() {
       <div className="mx-auto max-w-[1800px] p-6 xl:p-12">
         <div className="mb-10 xl:mb-12">
           <h1 className="mb-3 text-4xl font-black text-gray-900 xl:text-5xl">
-            系统演示
+            {TEXT.pageTitle}
           </h1>
-          <p className="text-lg text-gray-600 xl:text-xl">
-            上传主图，使用统一模型获取 CTR 预测与智能诊断。
-          </p>
+          <p className="text-lg text-gray-600 xl:text-xl">{TEXT.pageSubtitle}</p>
         </div>
 
         <div className="grid gap-8 xl:grid-cols-5">
@@ -249,9 +360,13 @@ export function DemoPage() {
               className="w-full rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center shadow-sm transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-md"
             >
               <div className="flex flex-col items-center gap-4">
-                <Upload size={48} className="text-blue-500" />
+                <i
+                  data-lucide="upload"
+                  className="text-blue-500"
+                  style={{ width: 48, height: 48 }}
+                />
                 <div>
-                  <p className="mb-1 font-bold text-gray-800">上传主图</p>
+                  <p className="mb-1 font-bold text-gray-800">{TEXT.uploadPrimary}</p>
                   <p className="text-sm text-gray-500">
                     {uploadedFile ? uploadedFile.name : 'JPG, PNG'}
                   </p>
@@ -263,12 +378,16 @@ export function DemoPage() {
               {previewUrl ? (
                 <img
                   src={previewUrl}
-                  alt="上传预览"
+                  alt={TEXT.uploadPreviewAlt}
                   className="size-full object-cover"
                 />
               ) : (
                 <div className="flex size-full items-center justify-center">
-                  <ImageIcon size={48} className="text-gray-300" />
+                  <i
+                    data-lucide="image"
+                    className="text-gray-300"
+                    style={{ width: 48, height: 48 }}
+                  />
                 </div>
               )}
             </div>
@@ -279,18 +398,24 @@ export function DemoPage() {
               disabled={!uploadedFile || loading}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 py-4 font-bold text-white shadow-lg transition-all hover:scale-[1.02] hover:from-blue-700 hover:to-cyan-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
             >
-              {loading ? <LoaderCircle size={20} className="animate-spin" /> : null}
-              {loading ? '分析中...' : '开始分析'}
+              {loading ? (
+                <i
+                  data-lucide="loader-circle"
+                  className="animate-spin"
+                  style={{ width: 20, height: 20 }}
+                />
+              ) : null}
+              {loading ? TEXT.analyzing : TEXT.startAnalyze}
             </button>
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-bold text-gray-600">模型状态</div>
+              <div className="text-sm font-bold text-gray-600">{TEXT.modelStatus}</div>
               <div className="mt-2 text-2xl font-black text-gray-900">
-                {MODEL_SUMMARY}
+                {TEXT.modelSummary}
               </div>
-              <p className="mt-1 text-sm text-gray-600">{MODEL_NOTE}</p>
+              <p className="mt-1 text-sm text-gray-600">{TEXT.modelNote}</p>
               <p className="mt-1 text-xs font-medium text-gray-500">
-                前端 localhost:5173 · 接口 localhost:8000
+                {TEXT.modelEndpoint}
               </p>
             </div>
 
@@ -302,26 +427,22 @@ export function DemoPage() {
           </div>
 
           <div className="space-y-8 xl:col-span-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              className="rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-8 shadow-lg transition-all hover:shadow-2xl xl:p-12"
-            >
+            <div className="animate-fade-scale-in rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-8 shadow-lg transition-all hover:shadow-2xl xl:p-12">
               <div className="flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <div className="mb-2 text-sm font-bold text-gray-600">
-                    CTR预测评分
+                    {TEXT.ctrPredictionScore}
                   </div>
                   <div className="text-7xl font-black text-blue-600 xl:text-9xl">
                     {scoreDisplay}
                   </div>
                   <p className="mt-4 text-lg text-gray-600 xl:text-xl">
-                    超过 <span className="font-bold text-green-600">{percentile}%</span>{' '}
-                    参考样本
+                    {TEXT.exceeds}{' '}
+                    <span className="font-bold text-green-600">{percentile}%</span>{' '}
+                    {TEXT.referenceSamples}
                   </p>
                   <p className="mt-2 text-sm font-medium text-gray-500">
-                    原始预测值: {rawScore}
+                    {TEXT.rawPrediction}: {rawScore}
                   </p>
                 </div>
 
@@ -362,49 +483,34 @@ export function DemoPage() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             <div className="grid gap-8 xl:grid-cols-2">
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
                 <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-800">
-                  <TrendingUp size={24} className="text-blue-600" />
-                  视觉特征分析
+                  <i
+                    data-lucide="trending-up"
+                    className="text-blue-600"
+                    style={{ width: 24, height: 24 }}
+                  />
+                  {TEXT.visualFeatureAnalysis}
                 </h3>
 
                 <div className="h-80">
                   {radarData.length ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={radarData}>
-                        <PolarGrid stroke="#d1d5db" />
-                        <PolarAngleAxis dataKey="feature" stroke="#374151" />
-                        <PolarRadiusAxis domain={[0, 100]} stroke="#6b7280" />
-                        <Radar
-                          name="特征值"
-                          dataKey="value"
-                          stroke="#2563eb"
-                          fill="#2563eb"
-                          fillOpacity={0.3}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
+                    <canvas
+                      ref={radarCanvasRef}
+                      style={{ width: '100%', height: '100%' }}
+                    />
                   ) : (
                     <div className="flex size-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-sm font-medium text-gray-500">
-                      分析完成后显示雷达图
+                      {TEXT.showRadarAfterAnalysis}
                     </div>
                   )}
                 </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-4 border-t-2 border-black pt-6 xl:grid-cols-5">
-                  {(radarData.length
-                    ? radarData
-                    : [
-                        { feature: '视觉熵', value: 0, display: '--' },
-                        { feature: '文字密度', value: 0, display: '--' },
-                        { feature: '亮度', value: 0, display: '--' },
-                        { feature: '对比度', value: 0, display: '--' },
-                        { feature: '饱和度', value: 0, display: '--' },
-                      ]
-                  ).map((item) => (
+                  {(radarData.length ? radarData : EMPTY_RADAR_DATA).map((item) => (
                     <div key={item.feature} className="text-center">
                       <div className="text-3xl font-black text-blue-600">
                         {item.display}
@@ -419,36 +525,40 @@ export function DemoPage() {
 
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
                 <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                  遮挡热力图分析
+                  {TEXT.occlusionHeatmapAnalysis}
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="mb-3 text-sm font-bold text-gray-600">
-                      原始图像
+                      {TEXT.originalImage}
                     </div>
                     <div className="aspect-square overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-300">
                       {previewUrl ? (
                         <img
                           src={previewUrl}
-                          alt="原始图像"
+                          alt={TEXT.originalImageAlt}
                           className="size-full object-cover"
                         />
                       ) : (
                         <div className="flex size-full items-center justify-center">
-                          <ImageIcon size={48} className="text-gray-400" />
+                          <i
+                            data-lucide="image"
+                            className="text-gray-400"
+                            style={{ width: 48, height: 48 }}
+                          />
                         </div>
                       )}
                     </div>
                   </div>
                   <div>
                     <div className="mb-3 text-sm font-bold text-gray-600">
-                      CTR贡献热力图
+                      {TEXT.ctrHeatmapContribution}
                     </div>
                     <div className="aspect-square overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-300">
                       {result?.heatmap_base64 ? (
                         <img
                           src={asImageSrc(result.heatmap_base64)}
-                          alt="CTR热力图"
+                          alt={TEXT.ctrHeatmapAlt}
                           className="size-full object-cover"
                         />
                       ) : (
@@ -457,15 +567,15 @@ export function DemoPage() {
                             <div className="flex items-center justify-center gap-2 text-xs font-bold">
                               <div className="flex items-center gap-1">
                                 <div className="h-4 w-4 rounded border border-gray-400 bg-red-500 shadow-sm" />
-                                <span>高</span>
+                                <span>{TEXT.high}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <div className="h-4 w-4 rounded border border-gray-400 bg-yellow-500 shadow-sm" />
-                                <span>中</span>
+                                <span>{TEXT.medium}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <div className="h-4 w-4 rounded border border-gray-400 bg-green-500 shadow-sm" />
-                                <span>低</span>
+                                <span>{TEXT.low}</span>
                               </div>
                             </div>
                           </div>
@@ -479,24 +589,23 @@ export function DemoPage() {
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
               <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                Top 5 相似爆款
+                {TEXT.topProducts}
               </h3>
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
                 {(topProducts.length
                   ? topProducts
                   : Array.from({ length: 5 }, (_, index) => ({
                       rank: index + 1,
-                      img_name: '等待结果',
+                      img_name: TEXT.waitingResult,
                       similarity: 0,
                       relative_ctr: 0,
                       price: 0,
                       img_base64: null,
                     }))
                 ).map((product) => (
-                  <motion.div
+                  <div
                     key={`${product.rank}-${product.img_name}`}
-                    whileHover={{ scale: 1.05, y: -4 }}
-                    className="cursor-pointer rounded-lg border-2 border-gray-200 p-4 transition-all hover:border-blue-400 hover:shadow-lg"
+                    className="card-hover cursor-pointer rounded-lg border-2 border-gray-200 p-4 transition-all hover:border-blue-400 hover:shadow-lg"
                   >
                     <div className="mb-4 aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
                       {product.img_base64 ? (
@@ -507,7 +616,11 @@ export function DemoPage() {
                         />
                       ) : (
                         <div className="flex size-full items-center justify-center">
-                          <ImageIcon size={32} className="text-gray-400" />
+                          <i
+                            data-lucide="image"
+                            className="text-gray-400"
+                            style={{ width: 32, height: 32 }}
+                          />
                         </div>
                       )}
                     </div>
@@ -516,7 +629,7 @@ export function DemoPage() {
                         #{product.rank} {product.img_name}
                       </div>
                       <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">相似度</span>
+                        <span className="text-gray-600">{TEXT.similarity}</span>
                         <span className="text-blue-600">
                           {(product.similarity * 100).toFixed(0)}%
                         </span>
@@ -528,39 +641,41 @@ export function DemoPage() {
                         </span>
                       </div>
                       <div className="flex justify-between font-bold">
-                        <span className="text-gray-600">价格</span>
+                        <span className="text-gray-600">{TEXT.price}</span>
                         <span className="text-gray-800">
-                          ¥{formatNumber(product.price, 2)}
+                          {'\u00a5'}
+                          {formatNumber(product.price, 2)}
                         </span>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
-              <h3 className="mb-6 text-2xl font-bold text-gray-800">优化建议</h3>
+              <h3 className="mb-6 text-2xl font-bold text-gray-800">
+                {TEXT.optimizationAdvice}
+              </h3>
               <div className="space-y-4">
                 {(suggestions.length
                   ? suggestions
                   : [
                       {
-                        priority: '低',
-                        category: '系统状态',
-                        issue: '等待分析结果',
-                        suggestion:
-                          '上传图片并点击“开始分析”后，将显示基于模型的优化建议。',
+                        priority: TEXT.low,
+                        category: TEXT.systemStatus,
+                        issue: TEXT.waitingAnalysisResult,
+                        suggestion: TEXT.waitingAdvice,
                         level: 'low' as SuggestionLevel,
                       },
                     ]
                 ).map((suggestion, index) => {
                   const style = getSuggestionStyle(suggestion.level);
+
                   return (
-                    <motion.div
+                    <div
                       key={`${suggestion.category}-${index}`}
-                      whileHover={{ x: 4 }}
-                      className={`flex cursor-pointer items-start gap-4 rounded-xl border-2 p-6 transition-all ${style.container}`}
+                      className={`suggestion-hover flex cursor-pointer items-start gap-4 rounded-xl border-2 p-6 transition-all ${style.container}`}
                     >
                       <div
                         className={`rounded-full px-3 py-1 text-sm font-bold ${style.badge}`}
@@ -579,7 +694,7 @@ export function DemoPage() {
                           {suggestion.suggestion}
                         </p>
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>
