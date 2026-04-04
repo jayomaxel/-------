@@ -1,12 +1,10 @@
 """
-CTR prediction adapter for the XGBoost bundle delivered by E.
+CTR prediction adapter for the shipped XGBoost artifacts.
 
-This module aligns runtime inference with the actual artifact layout used by
-training:
-- model and scaler are saved as separate pickle files
-- feature input is 514 dimensions: [entropy, text_density, clip_vector(512)]
-- no PCA projection is applied
-- no ctr_quantiles metadata is available, so percentile uses a linear fallback
+Runtime priority:
+1. Use the 517-dimension global model from `heatmap/`
+2. Fall back to the legacy 514-dimension dataset-specific bundle when available
+3. Fall back to a mock score when neither bundle is usable
 """
 
 from __future__ import annotations
@@ -19,6 +17,9 @@ import joblib
 import numpy as np
 
 import config
+
+MOCK_SCORE = 0.5
+MOCK_PERCENTILE = 50
 
 
 def _resolve_path(path_value: str) -> Path:
@@ -35,12 +36,9 @@ def _get_dataset_config(dataset_key: str) -> dict:
     return config.DATASETS[dataset_key]
 
 
-def _build_feature_vector(features: dict) -> np.ndarray:
-    scalar = np.asarray(
-        [
-            float(features.get("entropy", 0.0)),
-            float(features.get("text_density", 0.0)),
-        ],
+def _build_feature_vector(features: dict, scalar_cols: tuple[str, ...]) -> np.ndarray:
+    scalar_values = np.asarray(
+        [float(features.get(column, 0.0)) for column in scalar_cols],
         dtype=np.float32,
     )
 
@@ -54,93 +52,161 @@ def _build_feature_vector(features: dict) -> np.ndarray:
     elif clip_vector.size > config.CLIP_DIM:
         clip_vector = clip_vector[: config.CLIP_DIM]
 
-    return np.concatenate([scalar, clip_vector.astype(np.float32)]).reshape(1, -1)
+    return np.concatenate([scalar_values, clip_vector.astype(np.float32)]).reshape(1, -1)
+
+
+@functools.lru_cache(maxsize=16)
+def _load_bundle(
+    model_path_value: str,
+    scaler_path_value: str,
+    scalar_cols: tuple[str, ...],
+    scope: str,
+) -> dict | None:
+    model_path = _resolve_path(model_path_value)
+    scaler_path = _resolve_path(scaler_path_value)
+
+    if not model_path.exists():
+        logging.warning("CTR predictor: missing %s model file: %s", scope, model_path)
+        return None
+
+    if not scaler_path.exists():
+        logging.warning("CTR predictor: missing %s scaler file: %s", scope, scaler_path)
+        return None
+
+    try:
+        model = joblib.load(model_path)
+        scaler = joblib.load(scaler_path)
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("CTR predictor: failed to load %s bundle: %s", scope, exc)
+        return None
+
+    feature_dim = len(scalar_cols) + config.CLIP_DIM
+    return {
+        "model": model,
+        "scaler": scaler,
+        "scope": scope,
+        "feature_scalar_cols": scalar_cols,
+        "feature_dim": feature_dim,
+        "model_path": str(model_path),
+        "scaler_path": str(scaler_path),
+    }
+
+
+def _load_global_bundle() -> dict | None:
+    return _load_bundle(
+        config.MODEL_PATH,
+        config.SCALER_PATH,
+        tuple(config.FEATURE_SCALAR_COLS),
+        "global",
+    )
+
+
+def _load_legacy_bundle(dataset_key: str) -> dict | None:
+    dataset_cfg = _get_dataset_config(dataset_key)
+    return _load_bundle(
+        dataset_cfg["model_path"],
+        dataset_cfg["scaler_path"],
+        tuple(config.LEGACY_FEATURE_SCALAR_COLS),
+        f"legacy:{dataset_key}",
+    )
 
 
 @functools.lru_cache(maxsize=8)
 def load_model_bundle(dataset_key: str = config.DEFAULT_DATASET) -> dict | None:
-    """
-    Load the dataset-specific XGBoost model bundle from separate pickle files.
+    global_bundle = _load_global_bundle()
+    if global_bundle is not None:
+        return global_bundle
+    return _load_legacy_bundle(dataset_key)
 
-    Args:
-        dataset_key: Dataset key registered in `config.DATASETS`.
 
-    Returns:
-        A dict with `model` and `scaler` when both files are available and
-        load successfully; otherwise `None`.
-    """
-
-    dataset_cfg = _get_dataset_config(dataset_key)
-    model_path = _resolve_path(dataset_cfg["model_path"])
-    scaler_path = _resolve_path(dataset_cfg["scaler_path"])
-
-    if not model_path.exists():
-        logging.warning("CTR predictor: missing model file for dataset '%s': %s", dataset_key, model_path)
-        return None
-
-    if not scaler_path.exists():
-        logging.warning(
-            "CTR predictor: missing scaler file for dataset '%s': %s",
-            dataset_key,
-            scaler_path,
+def _predict_with_bundle(features: dict, bundle: dict) -> tuple[float, int]:
+    X = _build_feature_vector(features, bundle["feature_scalar_cols"])
+    expected_dim = int(bundle["feature_dim"])
+    if X.shape[1] != expected_dim:
+        raise ValueError(
+            f"Runtime feature dimension mismatch for {bundle['scope']}: "
+            f"expected {expected_dim}, got {X.shape[1]}"
         )
-        return None
 
-    try:
-        xgb_model = joblib.load(model_path)
-        scaler = joblib.load(scaler_path)
-    except Exception as exc:  # noqa: BLE001
-        logging.warning("CTR predictor: failed to load bundle for dataset '%s': %s", dataset_key, exc)
-        return None
-
-    return {"model": xgb_model, "scaler": scaler}
-
-
-def predict_ctr(features: dict, dataset_key: str = config.DEFAULT_DATASET) -> tuple[float, int]:
-    """
-    Predict CTR score and percentile from extracted image features.
-
-    The feature layout is strictly:
-    [entropy, text_density, clip_vector(512)]
-    Contrast, brightness, and saturation are intentionally excluded because
-    E's delivered model was not trained with them.
-
-    Args:
-        features: Feature dict returned by `modules.feature_extractor.extract_features()`.
-        dataset_key: Dataset key registered in `config.DATASETS`.
-
-    Returns:
-        A tuple of `(score, percentile)`.
-    """
-
-    bundle = load_model_bundle(dataset_key)
-    if bundle is None:
-        logging.warning("当前为Mock值，模型未就绪")
-        return 0.5, 50
-
-    X = _build_feature_vector(features)
-    expected_dim = X.shape[1]
-    scaler_dim = getattr(bundle["scaler"], "n_features_in_", expected_dim)
-
-    if int(scaler_dim) != int(expected_dim):
-        logging.warning(
-            "CTR predictor: scaler for dataset '%s' expects %s features, but runtime builds %s.",
-            dataset_key,
-            scaler_dim,
-            expected_dim,
+    scaler_dim = int(getattr(bundle["scaler"], "n_features_in_", expected_dim))
+    if scaler_dim != expected_dim:
+        raise ValueError(
+            f"Scaler dimension mismatch for {bundle['scope']}: "
+            f"expected {expected_dim}, scaler expects {scaler_dim}"
         )
-        logging.warning("当前为Mock值，模型未就绪")
-        return 0.5, 50
 
-    try:
-        X_scaled = bundle["scaler"].transform(X)[0]
-        score = float(bundle["model"].predict(X_scaled.reshape(1, -1))[0])
-    except Exception as exc:  # noqa: BLE001
-        logging.warning("CTR predictor: inference failed for dataset '%s': %s", dataset_key, exc)
-        logging.warning("当前为Mock值，模型未就绪")
-        return 0.5, 50
-
+    X_scaled = bundle["scaler"].transform(X)
+    score = float(bundle["model"].predict(X_scaled)[0])
     score = float(np.clip(score, 0.0, 1.0))
     score = float(np.round(score, 4))
     percentile = int(np.clip(score * 100, 1, 99))
     return score, percentile
+
+
+def _build_details(
+    *,
+    degraded: bool,
+    reason: str | None,
+    bundle_scope: str,
+) -> dict[str, object]:
+    return {
+        "degraded": degraded,
+        "reason": reason,
+        "bundle_scope": bundle_scope,
+    }
+
+
+def _mock_result(reason: str) -> tuple[float, int, dict[str, object]]:
+    return (
+        MOCK_SCORE,
+        MOCK_PERCENTILE,
+        _build_details(degraded=True, reason=reason, bundle_scope="mock"),
+    )
+
+
+def predict_ctr(
+    features: dict,
+    dataset_key: str = config.DEFAULT_DATASET,
+    return_details: bool = False,
+) -> tuple[float, int] | tuple[float, int, dict[str, object]]:
+    """
+    Predict CTR score and percentile from extracted image features.
+
+    Args:
+        features: Feature dict returned by `extract_features()`.
+        dataset_key: Dataset key used for legacy-model fallback only.
+        return_details: When true, include degradation metadata for the caller.
+
+    Returns:
+        `(score, percentile)` by default, or `(score, percentile, details)` when
+        `return_details=True`.
+    """
+
+    global_bundle = _load_global_bundle()
+    if global_bundle is not None:
+        try:
+            score, percentile = _predict_with_bundle(features, global_bundle)
+            details = _build_details(
+                degraded=False,
+                reason=None,
+                bundle_scope=str(global_bundle["scope"]),
+            )
+            return (score, percentile, details) if return_details else (score, percentile)
+        except Exception as exc:  # noqa: BLE001
+            logging.warning("CTR predictor: global bundle inference failed: %s", exc)
+
+    legacy_bundle = _load_legacy_bundle(dataset_key)
+    if legacy_bundle is not None:
+        try:
+            score, percentile = _predict_with_bundle(features, legacy_bundle)
+            details = _build_details(
+                degraded=True,
+                reason="ctr_fallback_legacy_model",
+                bundle_scope=str(legacy_bundle["scope"]),
+            )
+            return (score, percentile, details) if return_details else (score, percentile)
+        except Exception as exc:  # noqa: BLE001
+            logging.warning("CTR predictor: legacy bundle inference failed: %s", exc)
+
+    score, percentile, details = _mock_result("ctr_fallback_mock_value")
+    return (score, percentile, details) if return_details else (score, percentile)

@@ -53,8 +53,12 @@ IMAGES_DIR = DATASETS[DEFAULT_DATASET]["images_dir"]
 # Cache/model paths (legacy single-dataset style)
 CACHE_DIR = "cache"
 CLIP_VECTORS_PATH = DATASETS[DEFAULT_DATASET]["cache_vectors"]
-MODEL_PATH = DATASETS[DEFAULT_DATASET]["model_path"]
-SCALER_PATH = DATASETS[DEFAULT_DATASET]["scaler_path"]
+LEGACY_MODEL_PATH = DATASETS[DEFAULT_DATASET]["model_path"]
+LEGACY_SCALER_PATH = DATASETS[DEFAULT_DATASET]["scaler_path"]
+GLOBAL_MODEL_PATH = "heatmap/ctr_xgboost_model_global.pkl"
+GLOBAL_SCALER_PATH = "heatmap/ctr_feature_scaler.pkl"
+MODEL_PATH = GLOBAL_MODEL_PATH
+SCALER_PATH = GLOBAL_SCALER_PATH
 
 # Image preprocessing
 IMG_SIZE = (224, 224)
@@ -92,9 +96,21 @@ COL_CLICK_VOL = "click_volume"
 COL_CTR = "relative_ctr"
 COL_IMG_NAME = "std_img_name"
 
-# Feature vector layout for CTR model input
-FEATURE_SCALAR_COLS = ["entropy", "text_density"]
-FEATURE_DIM = len(FEATURE_SCALAR_COLS) + CLIP_DIM
+# Feature vector layouts for CTR model input
+LEGACY_FEATURE_SCALAR_COLS = ["entropy", "text_density"]
+LEGACY_FEATURE_DIM = len(LEGACY_FEATURE_SCALAR_COLS) + CLIP_DIM
+
+GLOBAL_FEATURE_SCALAR_COLS = [
+    "entropy",
+    "text_density",
+    "subject_area_ratio",
+    "edge_density",
+    "color_saturation",
+]
+GLOBAL_FEATURE_DIM = len(GLOBAL_FEATURE_SCALAR_COLS) + CLIP_DIM
+
+FEATURE_SCALAR_COLS = GLOBAL_FEATURE_SCALAR_COLS
+FEATURE_DIM = GLOBAL_FEATURE_DIM
 
 # Training-related constants (kept for compatibility)
 TRAIN_TEST_SPLIT = 0.2

@@ -55,6 +55,7 @@ const TEXT = {
   waitingAnalysisResult: '\u7b49\u5f85\u5206\u6790\u7ed3\u679c',
   waitingAdvice:
     '\u4e0a\u4f20\u56fe\u7247\u5e76\u70b9\u51fb\u201c\u5f00\u59cb\u5206\u6790\u201d\u540e\uff0c\u5c06\u663e\u793a\u57fa\u4e8e\u6a21\u578b\u7684\u4f18\u5316\u5efa\u8bae\u3002',
+  warningsTitle: '\u7cfb\u7edf\u964d\u7ea7\u63d0\u793a',
 } as const;
 
 const EMPTY_RADAR_DATA: RadarDatum[] = [
@@ -137,6 +138,7 @@ export function DemoPage() {
 
   const topProducts = result?.similar ?? [];
   const suggestions = result?.advice ?? [];
+  const warnings = result?.warnings ?? [];
 
   useEffect(() => {
     if (!radarData.length || !radarCanvasRef.current) return;
@@ -303,6 +305,22 @@ export function DemoPage() {
             {displayError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {displayError}
+              </div>
+            ) : null}
+
+            {warnings.length ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div className="font-semibold">{TEXT.warningsTitle}</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {warnings.map((warning) => (
+                    <code
+                      key={warning}
+                      className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium text-amber-900"
+                    >
+                      {warning}
+                    </code>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>

@@ -35,6 +35,7 @@ export interface AnalyzeResponse {
   heatmap_base64: string;
   similar: SimilarItem[];
   advice: AdviceItem[];
+  warnings?: string[];
 }
 
 export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
@@ -51,7 +52,25 @@ export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
 
-  return res.json();
+  const data = (await res.json()) as Partial<AnalyzeResponse>;
+
+  return {
+    features: {
+      entropy: data.features?.entropy ?? 0,
+      text_density: data.features?.text_density ?? 0,
+      brightness: data.features?.brightness ?? 0,
+      contrast: data.features?.contrast ?? 0,
+      saturation: data.features?.saturation ?? 0,
+    },
+    ctr: {
+      score: data.ctr?.score ?? 0.5,
+      percentile: data.ctr?.percentile ?? 50,
+    },
+    heatmap_base64: data.heatmap_base64 ?? '',
+    similar: data.similar ?? [],
+    advice: data.advice ?? [],
+    warnings: data.warnings ?? [],
+  };
 }
 
 export async function healthCheck(): Promise<boolean> {

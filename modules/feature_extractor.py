@@ -108,6 +108,48 @@ def _compute_text_density(image_rgb_uint8: np.ndarray) -> float:
     return _round4(density)
 
 
+def _compute_subject_area_ratio(image_rgb_uint8: np.ndarray) -> float:
+    gray = cv2.cvtColor(image_rgb_uint8, cv2.COLOR_RGB2GRAY)
+    blurred = cv2.GaussianBlur(gray, (7, 7), 0)
+    thresholded = cv2.adaptiveThreshold(
+        blurred,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV,
+        11,
+        2,
+    )
+    kernel = np.ones((5, 5), dtype=np.uint8)
+    closed = cv2.morphologyEx(thresholded, cv2.MORPH_CLOSE, kernel)
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if not contours:
+        return 0.0
+
+    image_area = float(image_rgb_uint8.shape[0] * image_rgb_uint8.shape[1])
+    if image_area <= 0:
+        return 0.0
+
+    max_area = float(max(cv2.contourArea(contour) for contour in contours))
+    return _round4(min(max_area / image_area, 1.0))
+
+
+def _compute_edge_density(image_rgb_uint8: np.ndarray) -> float:
+    gray = cv2.cvtColor(image_rgb_uint8, cv2.COLOR_RGB2GRAY)
+    edges = cv2.Canny(gray, 100, 200)
+    image_area = float(image_rgb_uint8.shape[0] * image_rgb_uint8.shape[1])
+    if image_area <= 0:
+        return 0.0
+    density = float(np.count_nonzero(edges)) / image_area
+    return _round4(min(density, 1.0))
+
+
+def _compute_color_saturation(image_rgb_uint8: np.ndarray) -> float:
+    hsv = cv2.cvtColor(image_rgb_uint8, cv2.COLOR_RGB2HSV)
+    saturation = float(np.mean(hsv[:, :, 1].astype(np.float32)) / 255.0)
+    return _round4(saturation)
+
+
 @functools.lru_cache(maxsize=4)
 def _load_clip_model(model_name: str, device_name: str):
     if torch is None:
@@ -141,7 +183,7 @@ def _extract_clip_vector(image_rgb_uint8: np.ndarray) -> np.ndarray:
 
 def _compute_hsv_stats(image_rgb_uint8: np.ndarray) -> tuple[float, float]:
     hsv = cv2.cvtColor(image_rgb_uint8, cv2.COLOR_RGB2HSV)
-    saturation = float(np.mean(hsv[:, :, 1] / 255.0))
+    saturation = _compute_color_saturation(image_rgb_uint8)
     brightness = float(np.mean(hsv[:, :, 2] / 255.0))
     return _round4(brightness), _round4(saturation)
 
@@ -153,6 +195,9 @@ def extract_features(image_array: np.ndarray) -> dict:
         'entropy': 0.0,
         'contrast': 0.0,
         'text_density': 0.0,
+        'subject_area_ratio': 0.0,
+        'edge_density': 0.0,
+        'color_saturation': 0.0,
         'clip_vector': np.zeros(config.CLIP_DIM, dtype=np.float32),
         'brightness': 0.0,
         'saturation': 0.0,
@@ -174,6 +219,21 @@ def extract_features(image_array: np.ndarray) -> dict:
         features['text_density'] = 0.0
 
     try:
+        features['subject_area_ratio'] = _compute_subject_area_ratio(image_rgb_uint8)
+    except Exception:
+        features['subject_area_ratio'] = 0.0
+
+    try:
+        features['edge_density'] = _compute_edge_density(image_rgb_uint8)
+    except Exception:
+        features['edge_density'] = 0.0
+
+    try:
+        features['color_saturation'] = _compute_color_saturation(image_rgb_uint8)
+    except Exception:
+        features['color_saturation'] = 0.0
+
+    try:
         features['clip_vector'] = _extract_clip_vector(image_rgb_uint8)
     except Exception:
         features['clip_vector'] = np.zeros(config.CLIP_DIM, dtype=np.float32)
@@ -185,5 +245,8 @@ def extract_features(image_array: np.ndarray) -> dict:
     except Exception:
         features['brightness'] = 0.0
         features['saturation'] = 0.0
+
+    if features['color_saturation'] == 0.0 and features['saturation'] != 0.0:
+        features['color_saturation'] = features['saturation']
 
     return features
