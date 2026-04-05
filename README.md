@@ -1,3 +1,52 @@
+# AI Analysis Addendum
+
+- Process note: this README should be updated together with each implementation step.
+- Current feature progress:
+  1. Added dependency `openai>=1.0.0`.
+  2. Added AI model config fields and environment variable override support.
+  3. Added backend endpoint `POST /ai-analysis`.
+  4. Replaced the frontend advice and psychology sections with one AI analysis card.
+  5. Added `modules/ai_analyzer.py` and switched AI analysis to structured JSON output.
+  6. Simplified `/ai-analysis` request body to `tone + features + ctr_score`.
+  7. Added a root one-click startup script `start.bat`.
+  8. Moved the frontend AI request into `src/api/ai.ts` and made the AI card self-managed.
+  9. Documented the runtime interaction flow between `/analyze` and `/ai-analysis`.
+  10. Cleaned up AI card UI copy and states to match the acceptance behavior.
+  11. Removed leftover frontend copy related to the deprecated advice and psychology sections.
+  12. Added AI setup modal, front-end API Key configuration, always-visible AI card, and same-tone cache.
+- `requirements.txt` now includes `openai>=1.0.0`.
+- `config.py` now exposes `AI_MODEL_BASE_URL`, `AI_MODEL_API_KEY`, `AI_MODEL_NAME`, `AI_MAX_TOKENS`, and `AI_TIMEOUT`.
+- These AI settings support environment variable overrides, which is safer than committing a real API key.
+- New endpoint: `POST /ai-analysis`
+- Supported `tone` values: `professional`, `gentle`, `direct`, `marketing`
+- Frontend now calls `/analyze` first, then reuses `features` and `ctr.score` to call `/ai-analysis`.
+- The old advice and psychological report panels are replaced by one AI report card with four tone switches.
+- `modules/ai_analyzer.py` is now the active backend analyzer and asks the model to return JSON with `summary`, `strengths`, `problems`, and `suggestions`.
+- If `AI_MODEL_API_KEY` is missing or invalid, `/ai-analysis` now returns a friendly configuration error instead of exposing raw provider details.
+- `/ai-analysis` now also accepts an optional `api_key` from the frontend and prefers that over the server default.
+- `/analyze` keeps all original fields, including `advice`, as fallback data. The frontend simply no longer displays that block.
+- Root startup entry: `start.bat`
+- `start.bat` is a thin wrapper around `start_all.bat`, so users can double-click or run it directly from the repo root.
+- Frontend AI API helper now lives in `src/api/ai.ts`.
+- `AIAnalysisCard.tsx` now requests `/ai-analysis` by itself and is controlled by the selected tone and API Key state from the page.
+- AI card copy and states now explicitly match the expected loading, success, and failure behavior.
+- The AI card is always visible on the page, even before analysis starts.
+- Clicking `开始分析` now opens an AI setup modal first, where the user picks tone and can input an API Key.
+- After `/analyze` finishes, the AI card auto-runs `/ai-analysis` with the selected tone and API Key.
+- Switching the tone button only reruns `/ai-analysis`, and cached results are reused for the same analysis fingerprint + API Key + tone.
+- The old downgrade warning panel is no longer rendered on the frontend.
+- `.gitignore` now ignores `.env`-style files and `config.local.py`.
+- Recommended frontend flow:
+  1. Call `/analyze` first.
+  2. Reuse `features` and `ctr.score` to call `/ai-analysis`.
+  3. Do not resend `heatmap_base64` or image base64 payloads to the LLM.
+- Runtime interaction flow:
+  1. User clicks `开始分析`.
+  2. Frontend uploads the image with `POST /analyze`.
+  3. After `/analyze` returns, the page immediately renders CTR, radar chart, feature cards, heatmap, and similar items.
+  4. The AI card then automatically sends `POST /ai-analysis` with `features + ctr_score + tone`.
+  5. When the user switches the tone button, only `/ai-analysis` is requested again; the image is not re-uploaded and `/analyze` is not rerun.
+
 # compet
 
 电商主图智能分析项目。当前仓库由两部分组成：

@@ -13,9 +13,11 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from PIL import Image
+from pydantic import BaseModel, Field
 
 import config
 from modules.advisor import generate_advice
+from modules.ai_analyzer import analyze_with_ai
 from modules.ctr_predictor import load_model_bundle, predict_ctr
 from modules.feature_extractor import extract_features
 from modules.heatmap import generate_heatmap
@@ -35,6 +37,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class AIAnalysisRequest(BaseModel):
+    tone: str = Field(default="professional", description="语气风格")
+    features: dict[str, Any] = Field(..., description="/analyze 返回的 features 对象")
+    ctr_score: float = Field(..., description="CTR 预测分")
+    api_key: str | None = Field(default=None, description="前端传入的 AI API Key")
 
 
 def _resolve_path(path_value: str) -> Path:
@@ -106,7 +115,9 @@ def _similar_image_to_base64(img_path: str | None) -> str | None:
 
 def _build_readiness_components() -> dict[str, bool]:
     ctr_bundle = load_model_bundle(config.DEFAULT_DATASET)
-    global_bundle_ready = ctr_bundle is not None and str(ctr_bundle.get("scope", "")).startswith("global")
+    global_bundle_ready = ctr_bundle is not None and str(ctr_bundle.get("scope", "")).startswith(
+        "global"
+    )
 
     components: dict[str, bool] = {
         "ctr_model": global_bundle_ready,
@@ -271,6 +282,29 @@ async def analyze(file: UploadFile = File(...)) -> Any:
                 temp_image_path.unlink(missing_ok=True)
             except Exception:
                 pass
+
+
+@app.post("/ai-analysis")
+async def ai_analysis(payload: AIAnalysisRequest) -> Any:
+    valid_tones = ["professional", "gentle", "direct", "marketing"]
+    tone = payload.tone if payload.tone in valid_tones else "professional"
+
+    try:
+        result = analyze_with_ai(
+            features=payload.features,
+            ctr_score=payload.ctr_score,
+            tone=tone,
+            api_key=payload.api_key,
+        )
+        return result
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(exc),
+            },
+        )
 
 
 if __name__ == "__main__":

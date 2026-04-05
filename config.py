@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # Project root directory
@@ -162,3 +163,10 @@ XGB_PARAMS = {
     "random_state": RANDOM_STATE,
     "verbosity": 1,
 }
+
+# AI analysis config
+AI_MODEL_BASE_URL = os.getenv("AI_MODEL_BASE_URL", "https://api.deepseek.com")
+AI_MODEL_API_KEY = os.getenv("AI_MODEL_API_KEY", "YOUR_API_KEY")
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "deepseek-chat")
+AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "1500"))
+AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "30"))

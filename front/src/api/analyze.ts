@@ -26,6 +26,7 @@ export interface SimilarItem {
   rank: number;
   dataset_key?: string;
   dataset_name?: string;
+  img_name?: string;
   similarity: number;
   relative_ctr: number;
   price: number;
@@ -86,6 +87,7 @@ export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
       rank: item.rank ?? 0,
       dataset_key: item.dataset_key ?? '',
       dataset_name: item.dataset_name ?? '',
+      img_name: item.img_name ?? '',
       similarity: item.similarity ?? 0,
       relative_ctr: item.relative_ctr ?? 0,
       price: item.price ?? 0,
