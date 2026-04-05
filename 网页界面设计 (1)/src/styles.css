@@ -3,11 +3,19 @@
 html,
 body,
 #root {
+  height: 100%;
   min-height: 100%;
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 45%, #f0fdfa 100%);
+}
+
+html {
+  overflow: hidden;
+  scrollbar-gutter: stable;
 }
 
 body {
   margin: 0;
+  overflow: hidden;
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 45%, #f0fdfa 100%);
   color: #111827;
@@ -19,6 +27,16 @@ body {
 
 img {
   display: block;
+  max-width: 100%;
+}
+
+.app-scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
 @keyframes fadeScaleIn {
@@ -35,7 +53,7 @@ img {
 }
 
 .card-hover:hover {
-  transform: scale(1.05) translateY(-4px);
+  transform: translateY(-4px);
   box-shadow: 0 10px 25px rgba(0,0,0,0.12);
 }
 
@@ -44,5 +62,5 @@ img {
 }
 
 .suggestion-hover:hover {
-  transform: translateX(4px);
+  transform: translateX(2px);
 }

@@ -188,7 +188,12 @@ def _compute_hsv_stats(image_rgb_uint8: np.ndarray) -> tuple[float, float]:
     return _round4(brightness), _round4(saturation)
 
 
-def extract_features(image_array: np.ndarray) -> dict:
+def extract_features(
+    image_array: np.ndarray,
+    *,
+    include_clip: bool = True,
+    include_text_density: bool = True,
+) -> dict:
     image_rgb_uint8 = _to_uint8_rgb(image_array)
 
     features: dict = {
@@ -213,10 +218,11 @@ def extract_features(image_array: np.ndarray) -> dict:
     except Exception:
         features['contrast'] = 0.0
 
-    try:
-        features['text_density'] = _compute_text_density(image_rgb_uint8)
-    except Exception:
-        features['text_density'] = 0.0
+    if include_text_density:
+        try:
+            features['text_density'] = _compute_text_density(image_rgb_uint8)
+        except Exception:
+            features['text_density'] = 0.0
 
     try:
         features['subject_area_ratio'] = _compute_subject_area_ratio(image_rgb_uint8)
@@ -233,10 +239,11 @@ def extract_features(image_array: np.ndarray) -> dict:
     except Exception:
         features['color_saturation'] = 0.0
 
-    try:
-        features['clip_vector'] = _extract_clip_vector(image_rgb_uint8)
-    except Exception:
-        features['clip_vector'] = np.zeros(config.CLIP_DIM, dtype=np.float32)
+    if include_clip:
+        try:
+            features['clip_vector'] = _extract_clip_vector(image_rgb_uint8)
+        except Exception:
+            features['clip_vector'] = np.zeros(config.CLIP_DIM, dtype=np.float32)
 
     try:
         brightness, saturation = _compute_hsv_stats(image_rgb_uint8)

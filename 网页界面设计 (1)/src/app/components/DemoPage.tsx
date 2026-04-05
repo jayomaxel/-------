@@ -4,6 +4,11 @@ import { FeaturePanel } from '../../components/FeaturePanel';
 import { HeatmapOverlay } from '../../components/HeatmapOverlay';
 import { SimilarList } from '../../components/SimilarList';
 import { useAnalyze } from '../../hooks/useAnalyze';
+import {
+  FEATURE_CONFIG,
+  formatFeatureValue,
+  normalizeFeature,
+} from '../../utils/featureDisplay';
 
 declare const window: Window & {
   Chart?: any;
@@ -11,71 +16,49 @@ declare const window: Window & {
 };
 
 type RadarDatum = {
+  key: string;
   feature: string;
   value: number;
+  rawValue: number;
   display: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000';
-
 const TEXT = {
-  modelSummary: '\u7edf\u4e00\u591a\u54c1\u7c7b\u6a21\u578b',
-  modelNote: '6 \u4e2a\u54c1\u7c7b\u8054\u5408\u8bad\u7ec3',
-  high: '\u9ad8',
-  medium: '\u4e2d',
-  low: '\u4f4e',
-  featureEntropy: '\u89c6\u89c9\u71b5',
-  featureTextDensity: '\u6587\u5b57\u5bc6\u5ea6',
-  featureBrightness: '\u4eae\u5ea6',
-  featureContrast: '\u5bf9\u6bd4\u5ea6',
-  featureSaturation: '\u9971\u548c\u5ea6',
-  pleaseUpload: '\u8bf7\u5148\u4e0a\u4f20\u56fe\u7247\u3002',
-  pageTitle: '\u7cfb\u7edf\u6f14\u793a',
-  pageSubtitle:
-    '\u4e0a\u4f20\u4e3b\u56fe\uff0c\u4f7f\u7528\u7edf\u4e00\u6a21\u578b\u83b7\u53d6 CTR \u9884\u6d4b\u4e0e\u667a\u80fd\u8bca\u65ad\u3002',
-  uploadPrimary: '\u4e0a\u4f20\u4e3b\u56fe',
-  uploadPreviewAlt: '\u4e0a\u4f20\u9884\u89c8',
-  startAnalyze: '\u5f00\u59cb\u5206\u6790',
-  analyzing: '\u5206\u6790\u4e2d...',
-  modelStatus: '\u6a21\u578b\u72b6\u6001',
-  modelEndpointPrefix:
-    '\u524d\u7aef localhost:5173 \u00b7 \u63a5\u53e3 ',
-  ctrPredictionScore: 'CTR\u9884\u6d4b\u8bc4\u5206',
-  exceeds: '\u8d85\u8fc7',
-  referenceSamples: '\u53c2\u8003\u6837\u672c',
-  rawPrediction: '\u539f\u59cb\u9884\u6d4b\u503c',
-  visualFeatureAnalysis: '\u89c6\u89c9\u7279\u5f81\u5206\u6790',
-  showRadarAfterAnalysis:
-    '\u5206\u6790\u5b8c\u6210\u540e\u663e\u793a\u96f7\u8fbe\u56fe',
-  occlusionHeatmapAnalysis: '\u906e\u6321\u70ed\u529b\u56fe\u5206\u6790',
-  originalImage: '\u539f\u59cb\u56fe\u50cf',
-  originalImageAlt: '\u539f\u59cb\u56fe\u50cf',
-  waitingResult: '\u7b49\u5f85\u7ed3\u679c',
-  systemStatus: '\u7cfb\u7edf\u72b6\u6001',
-  waitingAnalysisResult: '\u7b49\u5f85\u5206\u6790\u7ed3\u679c',
-  waitingAdvice:
-    '\u4e0a\u4f20\u56fe\u7247\u5e76\u70b9\u51fb\u201c\u5f00\u59cb\u5206\u6790\u201d\u540e\uff0c\u5c06\u663e\u793a\u57fa\u4e8e\u6a21\u578b\u7684\u4f18\u5316\u5efa\u8bae\u3002',
-  warningsTitle: '\u7cfb\u7edf\u964d\u7ea7\u63d0\u793a',
+  high: '高',
+  medium: '中',
+  low: '低',
+  pleaseUpload: '请先上传图片。',
+  pageTitle: '系统演示',
+  pageSubtitle: '上传主图，使用参考脚本同口径算法获取 CTR 预测与智能诊断。',
+  uploadPrimary: '上传主图',
+  uploadPreviewAlt: '上传预览',
+  startAnalyze: '开始分析',
+  analyzing: '分析中...',
+  ctrPredictionScore: 'CTR 预测评分',
+  ctrPredictionHint: '模型原始预测值，基于图像视觉特征的点击率预估',
+  visualFeatureAnalysis: '视觉特征分析',
+  showRadarAfterAnalysis: '分析完成后显示雷达图',
+  occlusionHeatmapAnalysis: '参考算法热力图',
+  originalImage: '原始图像',
+  originalImageAlt: '原始图像',
+  algorithmOutput: '注意力热力图',
+  waitingResult: '等待结果',
+  systemStatus: '系统状态',
+  waitingAnalysisResult: '等待分析结果',
+  waitingAdvice: '上传图片并点击“开始分析”后，将显示基于模型的优化建议。',
+  warningsTitle: '系统降级提示',
+  psychologicalReport: '参考脚本心理学诊断',
 } as const;
 
-const EMPTY_RADAR_DATA: RadarDatum[] = [
-  { feature: TEXT.featureEntropy, value: 0, display: '--' },
-  { feature: TEXT.featureTextDensity, value: 0, display: '--' },
-  { feature: TEXT.featureBrightness, value: 0, display: '--' },
-  { feature: TEXT.featureContrast, value: 0, display: '--' },
-  { feature: TEXT.featureSaturation, value: 0, display: '--' },
-];
+const EMPTY_RADAR_DATA: RadarDatum[] = FEATURE_CONFIG.map(({ key, label }) => ({
+  key,
+  feature: label,
+  value: 0,
+  rawValue: 0,
+  display: '--',
+}));
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
-
-const normalize = (value: number, max: number) => clamp((value / max) * 100, 0, 100);
-
-const formatNumber = (value: number, digits = 2) =>
-  Number(value ?? 0).toFixed(digits);
-
-const formatScore = (value: number) =>
-  value <= 1 ? (value * 100).toFixed(1) : value.toFixed(2);
+const formatCTR = (value: number) => Number(value ?? 0).toFixed(2);
 
 export function DemoPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -99,66 +82,92 @@ export function DemoPage() {
   }, [uploadedFile]);
 
   useEffect(() => {
-    window.lucide?.createIcons();
-  });
+    const timerId = window.setTimeout(() => {
+      try {
+        window.lucide?.createIcons();
+      } catch (iconError) {
+        console.error('Failed to initialize Lucide icons', iconError);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [result]);
 
   const radarData = useMemo<RadarDatum[]>(() => {
     if (!result) {
       return [];
     }
 
-    return [
-      {
-        feature: TEXT.featureEntropy,
-        value: normalize(result.features.entropy, 10),
-        display: formatNumber(result.features.entropy, 2),
-      },
-      {
-        feature: TEXT.featureTextDensity,
-        value: normalize(result.features.text_density, 1),
-        display: formatNumber(result.features.text_density, 2),
-      },
-      {
-        feature: TEXT.featureBrightness,
-        value: normalize(result.features.brightness, 1),
-        display: formatNumber(result.features.brightness, 2),
-      },
-      {
-        feature: TEXT.featureContrast,
-        value: normalize(result.features.contrast, 100),
-        display: formatNumber(result.features.contrast, 2),
-      },
-      {
-        feature: TEXT.featureSaturation,
-        value: normalize(result.features.saturation, 1),
-        display: formatNumber(result.features.saturation, 2),
-      },
-    ];
+    return FEATURE_CONFIG.map(({ key, label }) => {
+      const rawValue = Number(result.features[key] ?? 0);
+
+      return {
+        key,
+        feature: label,
+        value: normalizeFeature(key, rawValue),
+        rawValue,
+        display: formatFeatureValue(rawValue),
+      };
+    });
   }, [result]);
 
   const topProducts = result?.similar ?? [];
   const suggestions = result?.advice ?? [];
+  const reportLines = result?.psychological_report?.lines ?? [];
   const warnings = result?.warnings ?? [];
 
   useEffect(() => {
-    if (!radarData.length || !radarCanvasRef.current) return;
-
-    radarChartRef.current?.destroy();
-    radarChartRef.current = null;
+    if (!radarData.length || !radarCanvasRef.current) {
+      radarChartRef.current?.destroy();
+      radarChartRef.current = null;
+      return;
+    }
 
     const Chart = window.Chart;
     if (!Chart) return;
 
+    const radarIndicator = FEATURE_CONFIG.map(({ label, max }) => ({
+      name: label,
+      max: 1,
+      rawMax: max,
+    }));
+    const radarValues = radarData.map((datum) => datum.value);
+
+    console.log('=== 雷达图调试 ===');
+    console.log('indicator:', JSON.stringify(radarIndicator));
+    console.log('data:', JSON.stringify(radarValues));
+    console.log(
+      'rawData:',
+      JSON.stringify(
+        radarData.map((datum) => ({
+          key: datum.key,
+          label: datum.feature,
+          rawValue: datum.rawValue,
+          normalizedValue: datum.value,
+        })),
+      ),
+    );
+
+    radarChartRef.current?.destroy();
     radarChartRef.current = new Chart(radarCanvasRef.current, {
       type: 'radar',
       data: {
-        labels: radarData.map((datum) => datum.feature),
+        labels: radarIndicator.map((item) => item.name),
         datasets: [
           {
-            data: radarData.map((datum) => datum.value),
-            backgroundColor: 'rgba(37,99,235,0.3)',
-            borderColor: '#2563eb',
-            pointBackgroundColor: '#2563eb',
+            data: radarValues,
+            backgroundColor: 'rgba(59,130,246,0.2)',
+            borderColor: 'rgba(59,130,246,0.8)',
+            pointBackgroundColor: 'rgba(59,130,246,0.9)',
+            pointBorderColor: '#ffffff',
+            pointHoverBackgroundColor: '#2563eb',
+            pointHoverBorderColor: '#ffffff',
+            pointRadius: 4,
+            pointHoverRadius: 5,
+            pointHitRadius: 10,
+            borderWidth: 2,
           },
         ],
       },
@@ -168,13 +177,26 @@ export function DemoPage() {
         scales: {
           r: {
             min: 0,
-            max: 100,
+            max: 1,
             grid: { color: '#d1d5db' },
+            angleLines: { color: '#e5e7eb' },
             ticks: { display: false },
-            pointLabels: { color: '#374151', font: { size: 12 } },
+            pointLabels: { color: '#374151', font: { size: 11 } },
           },
         },
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items: Array<{ dataIndex: number }>) =>
+                items.length ? radarData[items[0].dataIndex]?.feature ?? '' : '',
+              label: (item: { dataIndex: number }) => {
+                const datum = radarData[item.dataIndex];
+                return datum ? `原始值: ${formatFeatureValue(datum.rawValue)}` : '';
+              },
+            },
+          },
+        },
       },
     });
 
@@ -194,7 +216,6 @@ export function DemoPage() {
     setUploadError(null);
     reset();
     setUploadedFile(nextFile);
-    void analyze(nextFile);
   };
 
   const handleAnalyze = () => {
@@ -208,26 +229,21 @@ export function DemoPage() {
   };
 
   const displayError = uploadError ?? error;
-
-  const scoreDisplay = result ? formatScore(result.ctr.score) : '--';
-  const rawScore = result ? formatNumber(result.ctr.score, 4) : '--';
-  const percentile = result?.ctr.percentile ?? 0;
-  const radius = 118;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - percentile / 100);
+  const scoreDisplay = result ? formatCTR(result.ctr.score) : '--';
 
   return (
-    <div className="min-h-screen overflow-y-auto bg-gray-50">
-      <div className="mx-auto max-w-[1800px] p-6 xl:p-12">
-        <div className="mb-10 xl:mb-12">
-          <h1 className="mb-3 text-4xl font-black text-gray-900 xl:text-5xl">
+    <div className="h-screen overflow-hidden bg-gray-50">
+      <div className="mx-auto flex h-full max-w-[1800px] flex-col px-6 pb-6 pt-3 xl:px-12 xl:pb-12 xl:pt-4">
+        <div className="shrink-0 border-b border-white/60 bg-gray-50/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-gray-50/80 xl:py-4">
+          <h1 className="mb-2 text-3xl font-black text-gray-900 xl:text-4xl">
             {TEXT.pageTitle}
           </h1>
-          <p className="text-lg text-gray-600 xl:text-xl">{TEXT.pageSubtitle}</p>
+          <p className="text-base text-gray-600 xl:text-lg">{TEXT.pageSubtitle}</p>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-5">
-          <div className="space-y-6 xl:col-span-1">
+        <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto pt-6 xl:overflow-hidden">
+          <div className="grid gap-8 xl:h-full xl:min-h-0 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
+          <aside className="space-y-6 xl:self-start xl:pr-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -290,18 +306,6 @@ export function DemoPage() {
               {loading ? TEXT.analyzing : TEXT.startAnalyze}
             </button>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-bold text-gray-600">{TEXT.modelStatus}</div>
-              <div className="mt-2 text-2xl font-black text-gray-900">
-                {TEXT.modelSummary}
-              </div>
-              <p className="mt-1 text-sm text-gray-600">{TEXT.modelNote}</p>
-              <p className="mt-1 text-xs font-medium text-gray-500">
-                {TEXT.modelEndpointPrefix}
-                {API_BASE}
-              </p>
-            </div>
-
             {displayError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {displayError}
@@ -323,148 +327,57 @@ export function DemoPage() {
                 </div>
               </div>
             ) : null}
-          </div>
+          </aside>
 
-          <div className="space-y-8 xl:col-span-4">
-            <div className="animate-fade-scale-in rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-8 shadow-lg transition-all hover:shadow-2xl xl:p-12">
-              <div className="flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                  <div className="mb-2 text-sm font-bold text-gray-600">
+          <main className="min-w-0 space-y-8 overflow-x-hidden pb-12 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-3 xl:pb-20">
+            <div className="flex flex-col gap-4 md:flex-row">
+              <div className="w-full md:w-1/3">
+                <div className="flex h-full min-h-[220px] flex-col justify-center rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-xl">
+                  <h3 className="mb-2 text-sm font-medium text-gray-500">
                     {TEXT.ctrPredictionScore}
-                  </div>
-                  <div className="text-7xl font-black text-blue-600 xl:text-9xl">
+                  </h3>
+                  <div className="text-5xl font-bold text-blue-600 tabular-nums">
                     {scoreDisplay}
                   </div>
-                  <p className="mt-4 text-lg text-gray-600 xl:text-xl">
-                    {TEXT.exceeds}{' '}
-                    <span className="font-bold text-green-600">{percentile}%</span>{' '}
-                    {TEXT.referenceSamples}
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-gray-500">
-                    {TEXT.rawPrediction}: {rawScore}
+                  <p className="mt-3 text-xs text-gray-400">
+                    {TEXT.ctrPredictionHint}
                   </p>
                 </div>
-
-                <div className="relative h-64 w-64 self-center rounded-full border-4 border-blue-300 shadow-lg">
-                  <svg
-                    viewBox="0 0 256 256"
-                    className="size-full -rotate-90 transform"
-                  >
-                    <circle
-                      cx="128"
-                      cy="128"
-                      r={radius}
-                      stroke="#e5e7eb"
-                      strokeWidth="12"
-                      fill="none"
-                    />
-                    <circle
-                      cx="128"
-                      cy="128"
-                      r={radius}
-                      stroke="url(#ctr-gradient)"
-                      strokeWidth="12"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={dashOffset}
-                      className="transition-all duration-1000"
-                    />
-                    <defs>
-                      <linearGradient id="ctr-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#2563eb" />
-                        <stop offset="100%" stopColor="#06b6d4" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center text-4xl font-black text-blue-600">
-                    {percentile}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-8 xl:grid-cols-2">
-              <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
-                <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-800">
-                  <i
-                    data-lucide="trending-up"
-                    className="text-blue-600"
-                    style={{ width: 24, height: 24 }}
-                  />
-                  {TEXT.visualFeatureAnalysis}
-                </h3>
-
-                <div className="h-80">
-                  {radarData.length ? (
-                    <canvas
-                      ref={radarCanvasRef}
-                      style={{ width: '100%', height: '100%' }}
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-sm font-medium text-gray-500">
-                      {TEXT.showRadarAfterAnalysis}
-                    </div>
-                  )}
-                </div>
-
-                {result ? (
-                  <FeaturePanel features={result.features} ctr={result.ctr} />
-                ) : (
-                  <div className="mt-6 grid grid-cols-2 gap-4 border-t-2 border-black pt-6 xl:grid-cols-5">
-                    {EMPTY_RADAR_DATA.map((item) => (
-                      <div key={item.feature} className="text-center">
-                        <div className="text-3xl font-black text-blue-600">
-                          {item.display}
-                        </div>
-                        <div className="mt-1 text-xs font-medium text-gray-600">
-                          {item.feature}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
-                <h3 className="mb-6 text-2xl font-bold text-gray-800">
-                  {TEXT.occlusionHeatmapAnalysis}
-                </h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <div className="mb-3 text-sm font-bold text-gray-600">
-                      {TEXT.originalImage}
-                    </div>
-                    <div className="aspect-square overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-50 transition-all hover:border-blue-300">
-                      {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt={TEXT.originalImageAlt}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center">
-                          <i
-                            data-lucide="image"
-                            className="text-gray-400"
-                            style={{ width: 48, height: 48 }}
+              <div className="w-full md:w-2/3">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-xl">
+                  <h3 className="mb-4 text-lg font-bold text-gray-800">
+                    {TEXT.occlusionHeatmapAnalysis}
+                  </h3>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
+                    <div className="flex-1 text-center">
+                      <p className="mb-2 text-sm text-gray-500">{TEXT.originalImage}</p>
+                      <div className="flex min-h-[260px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt={TEXT.originalImageAlt}
+                            className="max-h-[240px] w-full object-contain"
                           />
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex h-full min-h-[240px] w-full items-center justify-center">
+                            <i
+                              data-lucide="image"
+                              className="text-gray-300"
+                              style={{ width: 48, height: 48 }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="mb-3 text-sm font-bold text-gray-600">
-                      热力图叠加预览
-                    </div>
-                    <div className="rounded-lg transition-all hover:border-blue-300">
+
+                    <div className="flex-1 text-center">
+                      <p className="mb-2 text-sm text-gray-500">{TEXT.algorithmOutput}</p>
                       {previewUrl && result?.heatmap_base64 ? (
-                        <HeatmapOverlay
-                          originalPreview={previewUrl}
-                          heatmapBase64={result.heatmap_base64}
-                        />
+                        <HeatmapOverlay heatmapBase64={result.heatmap_base64} />
                       ) : (
-                        <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-gray-200 bg-gradient-to-br from-red-200 via-yellow-200 to-green-200">
+                        <div className="flex min-h-[260px] items-center justify-center rounded-lg border border-gray-200 bg-gradient-to-br from-red-200 via-yellow-200 to-green-200 p-4">
                           <div className="text-center">
                             <div className="flex items-center justify-center gap-2 text-xs font-bold">
                               <div className="flex items-center gap-1">
@@ -489,6 +402,55 @@ export function DemoPage() {
               </div>
             </div>
 
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-xl">
+              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-800">
+                <i
+                  data-lucide="trending-up"
+                  className="text-blue-600"
+                  style={{ width: 20, height: 20 }}
+                />
+                {TEXT.visualFeatureAnalysis}
+              </h3>
+              <div className="flex flex-col items-center gap-6 md:flex-row">
+                <div className="flex w-full justify-center md:w-2/5">
+                  <div className="h-[280px] w-[280px] max-w-full">
+                    {radarData.length ? (
+                      <canvas
+                        ref={radarCanvasRef}
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-sm font-medium text-gray-500">
+                        {TEXT.showRadarAfterAnalysis}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="w-full md:w-3/5">
+                  {result ? (
+                    <FeaturePanel features={result.features} />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                      {EMPTY_RADAR_DATA.map((item) => (
+                        <div
+                          key={item.key}
+                          className="rounded-xl border border-gray-100 bg-gray-50 px-2 py-4 text-center"
+                        >
+                          <div className="text-xl font-bold leading-tight text-blue-600 tabular-nums">
+                            {item.display}
+                          </div>
+                          <div className="mt-1.5 truncate text-xs text-gray-500">
+                            {item.feature}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
               <SimilarList
                 items={
@@ -496,12 +458,11 @@ export function DemoPage() {
                     ? topProducts
                     : Array.from({ length: 5 }, (_, index) => ({
                         rank: index + 1,
-                        img_name: TEXT.waitingResult,
                         similarity: 0,
                         relative_ctr: 0,
                         price: 0,
                         img_base64: null,
-                      }))
+                  }))
                 }
               />
             </div>
@@ -518,10 +479,28 @@ export function DemoPage() {
                           issue: TEXT.waitingAnalysisResult,
                           suggestion: TEXT.waitingAdvice,
                         },
-                      ]
+                  ]
                 }
               />
             </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
+              <h3 className="mb-6 text-2xl font-bold text-gray-800">
+                {TEXT.psychologicalReport}
+              </h3>
+              {reportLines.length ? (
+                <div className="space-y-3 text-sm leading-7 text-gray-700">
+                  {reportLines.map((line, index) => (
+                    <p key={`${index}-${line}`}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm font-medium text-gray-500">
+                  {TEXT.waitingAdvice}
+                </div>
+              )}
+            </div>
+          </main>
           </div>
         </div>
       </div>

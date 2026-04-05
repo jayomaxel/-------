@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from pathlib import Path
@@ -5,45 +6,86 @@ from pathlib import Path
 # Project root directory
 ROOT_DIR = Path(__file__).resolve().parent
 
-# Dataset paths (relative to ROOT_DIR)
-DRINK_DATA_DIR = "data/drink"
-DRINK_EXCEL_PATH = "data/drink/功能性饮料_数据集.xlsx"
-DRINK_IMAGES_DIR = "data/drink/images_standard"
-DRINK_IMG_PREFIX = "drink_"
-DRINK_SAMPLE_SIZE = 2115
+# Cache/model paths
+CACHE_DIR = "cache"
+GLOBAL_MODEL_PATH = "heatmap/ctr_xgboost_model_global.pkl"
+GLOBAL_SCALER_PATH = "heatmap/ctr_feature_scaler.pkl"
 
-LAMP_DATA_DIR = "data/lamp"
-LAMP_EXCEL_PATH = "data/lamp/桌面台灯_数据集.xlsx"
-LAMP_IMAGES_DIR = "data/lamp/images_standard"
-LAMP_IMG_PREFIX = "lamp_"
-LAMP_SAMPLE_SIZE = 2681
 
-# Dataset registry
+def _build_dataset_config(
+    *,
+    slug: str,
+    display_name: str,
+    excel_name: str,
+    img_prefix: str,
+    sample_size: int,
+) -> dict[str, str | int]:
+    base_dir = f"data/{slug}"
+    return {
+        "slug": slug,
+        "display_name": display_name,
+        "data_dir": base_dir,
+        "excel_path": f"{base_dir}/{excel_name}",
+        "images_dir": f"{base_dir}/images_standard",
+        "img_prefix": img_prefix,
+        "sample_size": sample_size,
+        "cache_vectors": f"{CACHE_DIR}/{slug}_clip_vectors.npy",
+        # The shipped heatmap / CTR artifacts are trained on a mixed six-category dataset.
+        "model_path": GLOBAL_MODEL_PATH,
+        "scaler_path": GLOBAL_SCALER_PATH,
+    }
+
+
+# Dataset registry used for retrieval resources / cache generation.
+# Frontend does not need dataset switching because inference uses the global mixed-category model.
 DATASETS = {
-    "功能性饮料": {
-        "data_dir": DRINK_DATA_DIR,
-        "excel_path": DRINK_EXCEL_PATH,
-        "images_dir": DRINK_IMAGES_DIR,
-        "img_prefix": DRINK_IMG_PREFIX,
-        "sample_size": DRINK_SAMPLE_SIZE,
-        "cache_vectors": "cache/drink_clip_vectors.npy",
-        "model_path": "models/ctr_xgboost_model.pkl",
-        "scaler_path": "models/ctr_feature_scaler.pkl",
-    },
-    "桌面台灯": {
-        "data_dir": LAMP_DATA_DIR,
-        "excel_path": LAMP_EXCEL_PATH,
-        "images_dir": LAMP_IMAGES_DIR,
-        "img_prefix": LAMP_IMG_PREFIX,
-        "sample_size": LAMP_SAMPLE_SIZE,
-        "cache_vectors": "cache/lamp_clip_vectors.npy",
-        "model_path": "models/lamp_xgboost_ctr.pkl",
-        "scaler_path": "models/lamp_ctr_feature_scaler.pkl",
-    },
+    "功能性饮料": _build_dataset_config(
+        slug="drink",
+        display_name="功能性饮料",
+        excel_name="功能性饮料_数据集.xlsx",
+        img_prefix="drink_",
+        sample_size=2115,
+    ),
+    "桌面台灯": _build_dataset_config(
+        slug="lamp",
+        display_name="桌面台灯",
+        excel_name="桌面台灯_数据集.xlsx",
+        img_prefix="lamp_",
+        sample_size=2681,
+    ),
+    "ins风手机壳": _build_dataset_config(
+        slug="phonecase",
+        display_name="ins风手机壳",
+        excel_name="ins风手机壳_数据集.xlsx",
+        img_prefix="phonecase_",
+        sample_size=565,
+    ),
+    "创意玻璃杯": _build_dataset_config(
+        slug="glass",
+        display_name="创意玻璃杯",
+        excel_name="创意玻璃杯_数据集.xlsx",
+        img_prefix="glass_",
+        sample_size=570,
+    ),
+    "印花丝巾": _build_dataset_config(
+        slug="scarf",
+        display_name="印花丝巾",
+        excel_name="印花丝巾_数据集.xlsx",
+        img_prefix="scarf_",
+        sample_size=651,
+    ),
+    "口红": _build_dataset_config(
+        slug="lipstick",
+        display_name="口红",
+        excel_name="口红_数据集.xlsx",
+        img_prefix="lipstick_",
+        sample_size=501,
+    ),
 }
 
 # Default dataset key used by internal module defaults.
 DEFAULT_DATASET = "功能性饮料"
+RETRIEVAL_DATASET_KEY = "all"
 
 # Legacy aliases (kept for backward compatibility with older scripts).
 DATA_DIR = DATASETS[DEFAULT_DATASET]["data_dir"]
@@ -51,12 +93,9 @@ EXCEL_PATH = DATASETS[DEFAULT_DATASET]["excel_path"]
 IMAGES_DIR = DATASETS[DEFAULT_DATASET]["images_dir"]
 
 # Cache/model paths (legacy single-dataset style)
-CACHE_DIR = "cache"
 CLIP_VECTORS_PATH = DATASETS[DEFAULT_DATASET]["cache_vectors"]
 LEGACY_MODEL_PATH = DATASETS[DEFAULT_DATASET]["model_path"]
 LEGACY_SCALER_PATH = DATASETS[DEFAULT_DATASET]["scaler_path"]
-GLOBAL_MODEL_PATH = "heatmap/ctr_xgboost_model_global.pkl"
-GLOBAL_SCALER_PATH = "heatmap/ctr_feature_scaler.pkl"
 MODEL_PATH = GLOBAL_MODEL_PATH
 SCALER_PATH = GLOBAL_SCALER_PATH
 

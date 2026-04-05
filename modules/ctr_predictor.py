@@ -19,7 +19,6 @@ import numpy as np
 import config
 
 MOCK_SCORE = 0.5
-MOCK_PERCENTILE = 50
 
 
 def _resolve_path(path_value: str) -> Path:
@@ -119,7 +118,7 @@ def load_model_bundle(dataset_key: str = config.DEFAULT_DATASET) -> dict | None:
     return _load_legacy_bundle(dataset_key)
 
 
-def _predict_with_bundle(features: dict, bundle: dict) -> tuple[float, int]:
+def _predict_with_bundle(features: dict, bundle: dict) -> tuple[float, int | None]:
     X = _build_feature_vector(features, bundle["feature_scalar_cols"])
     expected_dim = int(bundle["feature_dim"])
     if X.shape[1] != expected_dim:
@@ -137,10 +136,8 @@ def _predict_with_bundle(features: dict, bundle: dict) -> tuple[float, int]:
 
     X_scaled = bundle["scaler"].transform(X)
     score = float(bundle["model"].predict(X_scaled)[0])
-    score = float(np.clip(score, 0.0, 1.0))
     score = float(np.round(score, 4))
-    percentile = int(np.clip(score * 100, 1, 99))
-    return score, percentile
+    return score, None
 
 
 def _build_details(
@@ -148,19 +145,26 @@ def _build_details(
     degraded: bool,
     reason: str | None,
     bundle_scope: str,
+    percentile_available: bool,
 ) -> dict[str, object]:
     return {
         "degraded": degraded,
         "reason": reason,
         "bundle_scope": bundle_scope,
+        "percentile_available": percentile_available,
     }
 
 
-def _mock_result(reason: str) -> tuple[float, int, dict[str, object]]:
+def _mock_result(reason: str) -> tuple[float, None, dict[str, object]]:
     return (
         MOCK_SCORE,
-        MOCK_PERCENTILE,
-        _build_details(degraded=True, reason=reason, bundle_scope="mock"),
+        None,
+        _build_details(
+            degraded=True,
+            reason=reason,
+            bundle_scope="mock",
+            percentile_available=False,
+        ),
     )
 
 
@@ -168,7 +172,7 @@ def predict_ctr(
     features: dict,
     dataset_key: str = config.DEFAULT_DATASET,
     return_details: bool = False,
-) -> tuple[float, int] | tuple[float, int, dict[str, object]]:
+) -> tuple[float, int | None] | tuple[float, int | None, dict[str, object]]:
     """
     Predict CTR score and percentile from extracted image features.
 
@@ -179,7 +183,9 @@ def predict_ctr(
 
     Returns:
         `(score, percentile)` by default, or `(score, percentile, details)` when
-        `return_details=True`.
+        `return_details=True`. `percentile` is intentionally `None` because the
+        shipped model only provides a raw regression score and this service does not
+        ship a real percentile ranking baseline.
     """
 
     global_bundle = _load_global_bundle()
@@ -190,6 +196,7 @@ def predict_ctr(
                 degraded=False,
                 reason=None,
                 bundle_scope=str(global_bundle["scope"]),
+                percentile_available=percentile is not None,
             )
             return (score, percentile, details) if return_details else (score, percentile)
         except Exception as exc:  # noqa: BLE001
@@ -203,6 +210,7 @@ def predict_ctr(
                 degraded=True,
                 reason="ctr_fallback_legacy_model",
                 bundle_scope=str(legacy_bundle["scope"]),
+                percentile_available=percentile is not None,
             )
             return (score, percentile, details) if return_details else (score, percentile)
         except Exception as exc:  # noqa: BLE001

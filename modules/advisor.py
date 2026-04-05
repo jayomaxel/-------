@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 File Purpose:
     Rule-based optimization advisor for product main image diagnosis.
@@ -8,8 +9,8 @@ Main Function:
 Input / Output Types:
     - Input:
         features: dict from feature_extractor (entropy/contrast/text_density/brightness/etc.)
-        ctr_score: float in [0, 1]
-        ctr_percentile: int in [0, 100]
+        ctr_score: float
+        ctr_percentile: int in [0, 100] or None
     - Output:
         list[dict], each item contains:
         {"priority": str, "category": str, "issue": str, "suggestion": str}
@@ -34,15 +35,24 @@ def _to_int(value: object, default: int = 0) -> int:
         return default
 
 
-def generate_advice(features: dict, ctr_score: float, ctr_percentile: int) -> list[dict]:
+def _to_optional_int(value: object) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except Exception:
+        return None
+
+
+def generate_advice(features: dict, ctr_score: float, ctr_percentile: int | None) -> list[dict]:
     """
     Generate ordered optimization advice based on visual features and CTR ranking.
 
     Args:
         features: Feature dictionary returned by `extract_features`, expected keys include
             `entropy`, `contrast`, `text_density`, and `brightness`.
-        ctr_score: Predicted CTR score (0~1). Used as context text in advice output.
-        ctr_percentile: Percentile rank within dataset (0~100).
+        ctr_score: Predicted CTR raw score.
+        ctr_percentile: Percentile rank within dataset (0~100), if available.
 
     Returns:
         list[dict]: Advice list sorted by priority order `高 -> 中 -> 低`.
@@ -59,7 +69,7 @@ def generate_advice(features: dict, ctr_score: float, ctr_percentile: int) -> li
     contrast = _to_float(features.get("contrast", 0.0))
     text_density = _to_float(features.get("text_density", 0.0))
     brightness = _to_float(features.get("brightness", 0.0))
-    percentile = _to_int(ctr_percentile, 0)
+    percentile = _to_optional_int(ctr_percentile)
     score = _to_float(ctr_score, 0.0)
 
     advice: list[dict] = []
@@ -131,7 +141,7 @@ def generate_advice(features: dict, ctr_score: float, ctr_percentile: int) -> li
             }
         )
 
-    if percentile < config.CTR_PCT_LOW:
+    if percentile is not None and percentile < config.CTR_PCT_LOW:
         advice.append(
             {
                 "priority": "高",
@@ -143,7 +153,7 @@ def generate_advice(features: dict, ctr_score: float, ctr_percentile: int) -> li
                 "suggestion": "综合表现偏弱，建议参考爆款样式对主图进行结构性重设计。",
             }
         )
-    elif config.CTR_PCT_LOW <= percentile < config.CTR_PCT_MID:
+    elif percentile is not None and config.CTR_PCT_LOW <= percentile < config.CTR_PCT_MID:
         advice.append(
             {
                 "priority": "中",

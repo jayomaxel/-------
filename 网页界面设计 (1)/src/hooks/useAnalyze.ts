@@ -23,7 +23,7 @@ export function useAnalyze(): UseAnalyzeReturn {
       const data = await analyzeImage(file);
       setResult(data);
     } catch (err: any) {
-      setError(err.message ?? '\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u540e\u7aef\u662f\u5426\u542f\u52a8');
+      setError(err.message ?? '分析失败，请检查后端是否启动');
     } finally {
       setLoading(false);
     }

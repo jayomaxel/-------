@@ -4,9 +4,11 @@ File Purpose:
 
 Main Functions:
     - load_dataset_vectors(dataset_key: str = config.DEFAULT_DATASET) -> tuple[np.ndarray, pd.DataFrame]
+    - load_retrieval_corpus(dataset_key: str | None = config.RETRIEVAL_DATASET_KEY)
+      -> tuple[np.ndarray, pd.DataFrame]
     - retrieve_similar(
         query_vector: np.ndarray,
-        dataset_key: str = config.DEFAULT_DATASET,
+        dataset_key: str | None = config.RETRIEVAL_DATASET_KEY,
         top_k: int = config.TOP_K_SIMILAR
       ) -> list[dict]
 
@@ -24,6 +26,10 @@ import numpy as np
 import pandas as pd
 
 import config
+
+DATASET_KEY_COL = "__dataset_key"
+DATASET_NAME_COL = "__dataset_name"
+IMAGES_DIR_COL = "__images_dir"
 
 
 def _round4(value: float) -> float:
@@ -48,6 +54,19 @@ def _get_dataset_config(dataset_key: str) -> dict:
             f"Unknown dataset_key: {dataset_key}. Available dataset keys: {valid_keys}"
         )
     return config.DATASETS[dataset_key]
+
+
+def _normalize_dataset_keys(dataset_key: str | None) -> tuple[str, ...]:
+    """Resolve a retrieval scope into one or more configured dataset keys."""
+    if dataset_key is None:
+        return tuple(config.DATASETS.keys())
+
+    normalized = str(dataset_key).strip()
+    if not normalized or normalized.lower() == "all":
+        return tuple(config.DATASETS.keys())
+
+    _get_dataset_config(normalized)
+    return (normalized,)
 
 
 def _safe_float(value: object) -> float:
@@ -139,9 +158,57 @@ def load_dataset_vectors(
     return vectors, dataframe
 
 
+@functools.lru_cache(maxsize=8)
+def _load_retrieval_corpus_cached(
+    dataset_keys: tuple[str, ...],
+) -> tuple[np.ndarray, pd.DataFrame]:
+    """Load and merge one or more configured datasets into a single retrieval corpus."""
+    vector_parts: list[np.ndarray] = []
+    dataframe_parts: list[pd.DataFrame] = []
+
+    for key in dataset_keys:
+        vectors, dataframe = load_dataset_vectors(key)
+        dataset_cfg = _get_dataset_config(key)
+
+        dataframe_copy = dataframe.copy()
+        dataframe_copy[DATASET_KEY_COL] = key
+        dataframe_copy[DATASET_NAME_COL] = str(dataset_cfg.get("display_name", key))
+        dataframe_copy[IMAGES_DIR_COL] = str(dataset_cfg["images_dir"])
+
+        vector_parts.append(np.asarray(vectors, dtype=np.float32))
+        dataframe_parts.append(dataframe_copy)
+
+    if not vector_parts:
+        return np.zeros((0, config.CLIP_DIM), dtype=np.float32), pd.DataFrame()
+
+    merged_vectors = np.concatenate(vector_parts, axis=0)
+    merged_dataframe = pd.concat(dataframe_parts, ignore_index=True)
+    return merged_vectors, merged_dataframe
+
+
+def load_retrieval_corpus(
+    dataset_key: str | None = config.RETRIEVAL_DATASET_KEY,
+) -> tuple[np.ndarray, pd.DataFrame]:
+    """
+    Load the retrieval corpus for one dataset or the full cross-category corpus.
+
+    Args:
+        dataset_key:
+            - specific dataset key in `config.DATASETS`
+            - `"all"` / `None` to merge all configured datasets
+
+    Returns:
+        tuple[np.ndarray, pd.DataFrame]:
+            - vectors: CLIP vector matrix with shape (N, 512)
+            - dataframe: merged dataset rows enriched with dataset metadata columns
+    """
+    dataset_keys = _normalize_dataset_keys(dataset_key)
+    return _load_retrieval_corpus_cached(dataset_keys)
+
+
 def retrieve_similar(
     query_vector: np.ndarray,
-    dataset_key: str = config.DEFAULT_DATASET,
+    dataset_key: str | None = config.RETRIEVAL_DATASET_KEY,
     top_k: int = config.TOP_K_SIMILAR,
 ) -> list[dict]:
     """
@@ -149,8 +216,9 @@ def retrieve_similar(
 
     Args:
         query_vector: Query CLIP vector, expected shape (512,) or flattenable to 512.
-        dataset_key: Dataset key in `config.DATASETS`. Supports dynamic switching, e.g.
-            `config.DEFAULT_DATASET` or `"功能性饮料"`.
+        dataset_key:
+            - specific dataset key in `config.DATASETS`
+            - `"all"` / `None` to search across all configured datasets
         top_k: Number of top results to return.
 
     Returns:
@@ -167,8 +235,7 @@ def retrieve_similar(
         FileNotFoundError: If required dataset files are missing.
         RuntimeError: If underlying file loading fails.
     """
-    vectors, dataframe = load_dataset_vectors(dataset_key)
-    dataset_cfg = _get_dataset_config(dataset_key)
+    vectors, dataframe = load_retrieval_corpus(dataset_key)
 
     query = np.asarray(query_vector, dtype=np.float32).reshape(-1)
     if query.size != vectors.shape[1]:
@@ -211,12 +278,14 @@ def retrieve_similar(
     top_indices = candidate_indices[partition_ids]
     top_indices = top_indices[np.argsort(similarities[top_indices])[::-1]]
 
-    images_dir = _resolve_path(dataset_cfg["images_dir"])
     results: list[dict] = []
 
     for rank, idx in enumerate(top_indices, start=1):
         row = dataframe.iloc[idx]
         img_name = str(row.get(config.COL_IMG_NAME, ""))
+        row_dataset_key = str(row.get(DATASET_KEY_COL, ""))
+        row_dataset_name = str(row.get(DATASET_NAME_COL, row_dataset_key))
+        images_dir = _resolve_path(str(row.get(IMAGES_DIR_COL, "")))
 
         img_path = None
         if img_name:
@@ -227,6 +296,8 @@ def retrieve_similar(
         results.append(
             {
                 "rank": rank,
+                "dataset_key": row_dataset_key,
+                "dataset_name": row_dataset_name,
                 "img_name": img_name,
                 "img_path": img_path,
                 "similarity": _round4(similarities[idx]),

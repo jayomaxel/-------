@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,11 @@ from modules.ctr_predictor import load_model_bundle, predict_ctr
 from modules.feature_extractor import extract_features
 from modules.heatmap import generate_heatmap
 from modules.preprocessor import preprocess_image
-from modules.retriever import load_dataset_vectors, retrieve_similar
+from modules.reference_pipeline import (
+    extract_reference_features,
+    generate_psychological_report,
+)
+from modules.retriever import load_retrieval_corpus, retrieve_similar
 
 app = FastAPI(title="E-commerce Main Image Analysis API")
 
@@ -100,23 +105,30 @@ def _similar_image_to_base64(img_path: str | None) -> str | None:
 
 
 def _build_readiness_components() -> dict[str, bool]:
-    dataset_cfg = config.DATASETS[config.DEFAULT_DATASET]
-
     ctr_bundle = load_model_bundle(config.DEFAULT_DATASET)
     global_bundle_ready = ctr_bundle is not None and str(ctr_bundle.get("scope", "")).startswith("global")
 
     components: dict[str, bool] = {
         "ctr_model": global_bundle_ready,
         "ctr_scaler": global_bundle_ready,
-        "vector_cache": _resolve_path(dataset_cfg["cache_vectors"]).exists(),
-        "dataset_excel": _resolve_path(dataset_cfg["excel_path"]).exists(),
-        "dataset_images": _resolve_path(dataset_cfg["images_dir"]).exists(),
+        "vector_cache": all(
+            _resolve_path(str(dataset_cfg["cache_vectors"])).exists()
+            for dataset_cfg in config.DATASETS.values()
+        ),
+        "dataset_excel": all(
+            _resolve_path(str(dataset_cfg["excel_path"])).exists()
+            for dataset_cfg in config.DATASETS.values()
+        ),
+        "dataset_images": all(
+            _resolve_path(str(dataset_cfg["images_dir"])).exists()
+            for dataset_cfg in config.DATASETS.values()
+        ),
     }
 
     retrieval_ready = False
     if components["vector_cache"] and components["dataset_excel"] and components["dataset_images"]:
         try:
-            load_dataset_vectors(config.DEFAULT_DATASET)
+            load_retrieval_corpus(config.RETRIEVAL_DATASET_KEY)
             retrieval_ready = True
         except Exception:
             retrieval_ready = False
@@ -141,80 +153,124 @@ def health() -> dict[str, Any]:
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)) -> Any:
     warnings: list[str] = []
+    temp_image_path: Path | None = None
 
     try:
-        file_bytes = await file.read()
-        pil_image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-        image_array = np.array(pil_image)
-        processed_image = preprocess_image(image_array)
-        features = extract_features(processed_image)
-    except Exception as exc:  # noqa: BLE001
-        return JSONResponse(status_code=400, content={"error": f"Image processing failed: {exc}"})
+        try:
+            file_bytes = await file.read()
+            suffix = Path(file.filename or "upload.png").suffix or ".png"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                temp_file.write(file_bytes)
+                temp_image_path = Path(temp_file.name)
 
-    try:
-        ctr_score, ctr_percentile, ctr_details = predict_ctr(features, return_details=True)
-        if bool(ctr_details.get("degraded")):
-            reason = ctr_details.get("reason")
-            if isinstance(reason, str) and reason:
-                warnings.append(reason)
-    except Exception:  # noqa: BLE001
-        ctr_score, ctr_percentile = 0.5, 50
-        warnings.append("ctr_fallback_mock_value")
+            pil_image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            image_array = np.array(pil_image)
+            processed_image = preprocess_image(image_array)
+            features = extract_features(
+                processed_image,
+                include_clip=False,
+                include_text_density=False,
+            )
+            reference_features = extract_reference_features(temp_image_path)
+            features.update(reference_features)
+            if _to_float(features.get("saturation", 0.0)) == 0.0:
+                features["saturation"] = _to_float(features.get("color_saturation", 0.0))
+        except Exception as exc:  # noqa: BLE001
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Image processing failed: {exc}"},
+            )
 
-    try:
-        heatmap_array = generate_heatmap(processed_image)
-    except Exception:  # noqa: BLE001
-        heatmap_array = processed_image
-        warnings.append("heatmap_fallback_original_image")
+        try:
+            ctr_score, ctr_percentile, ctr_details = predict_ctr(features, return_details=True)
+            if bool(ctr_details.get("degraded")):
+                reason = ctr_details.get("reason")
+                if isinstance(reason, str) and reason:
+                    warnings.append(reason)
+        except Exception:  # noqa: BLE001
+            ctr_score, ctr_percentile = 0.5, None
+            warnings.append("ctr_fallback_mock_value")
 
-    similar_items: list[dict] = []
-    try:
-        similar_items = retrieve_similar(features["clip_vector"], top_k=config.TOP_K_SIMILAR)
-    except Exception:  # noqa: BLE001
-        warnings.append("retrieval_disabled")
+        try:
+            heatmap_array = generate_heatmap(image_array)
+        except Exception:  # noqa: BLE001
+            heatmap_array = image_array
+            warnings.append("heatmap_fallback_original_image")
 
-    advice: list[dict] = []
-    try:
-        advice = generate_advice(features, float(ctr_score), int(ctr_percentile))
-    except Exception:  # noqa: BLE001
-        warnings.append("advice_generation_failed")
+        similar_items: list[dict] = []
+        try:
+            similar_items = retrieve_similar(
+                features["clip_vector"],
+                dataset_key=config.RETRIEVAL_DATASET_KEY,
+                top_k=config.TOP_K_SIMILAR,
+            )
+        except Exception:  # noqa: BLE001
+            warnings.append("retrieval_disabled")
 
-    response = {
-        "features": {
-            "entropy": _to_float(features.get("entropy", 0.0)),
-            "text_density": _to_float(features.get("text_density", 0.0)),
-            "brightness": _to_float(features.get("brightness", 0.0)),
-            "contrast": _to_float(features.get("contrast", 0.0)),
-            "saturation": _to_float(features.get("saturation", 0.0)),
-        },
-        "ctr": {
-            "score": _to_float(ctr_score),
-            "percentile": int(ctr_percentile),
-        },
-        "heatmap_base64": _rgb_array_to_base64(heatmap_array),
-        "similar": [
-            {
-                "rank": int(item.get("rank", index + 1)),
-                "img_name": str(item.get("img_name", "")),
-                "similarity": _to_float(item.get("similarity", 0.0)),
-                "relative_ctr": _to_float(item.get("relative_ctr", 0.0)),
-                "price": _to_float(item.get("price", 0.0)),
-                "img_base64": _similar_image_to_base64(item.get("img_path")),
-            }
-            for index, item in enumerate(similar_items[: config.TOP_K_SIMILAR])
-        ],
-        "advice": [
-            {
-                "priority": str(item.get("priority", "")),
-                "category": str(item.get("category", "")),
-                "issue": str(item.get("issue", "")),
-                "suggestion": str(item.get("suggestion", "")),
-            }
-            for item in advice
-        ],
-        "warnings": warnings,
-    }
-    return response
+        advice: list[dict] = []
+        try:
+            advice = generate_advice(features, float(ctr_score), ctr_percentile)
+        except Exception:  # noqa: BLE001
+            warnings.append("advice_generation_failed")
+
+        psychological_report = {"lines": [], "text": ""}
+        try:
+            psychological_report = generate_psychological_report(features, float(ctr_score))
+        except Exception:  # noqa: BLE001
+            warnings.append("psychological_report_failed")
+
+        response = {
+            "features": {
+                "entropy": _to_float(features.get("entropy", 0.0)),
+                "text_density": _to_float(features.get("text_density", 0.0)),
+                "brightness": _to_float(features.get("brightness", 0.0)),
+                "contrast": _to_float(features.get("contrast", 0.0)),
+                "saturation": _to_float(features.get("saturation", 0.0)),
+                "subject_area_ratio": _to_float(features.get("subject_area_ratio", 0.0)),
+                "edge_density": _to_float(features.get("edge_density", 0.0)),
+                "color_saturation": _to_float(features.get("color_saturation", 0.0)),
+            },
+            "ctr": {
+                "score": _to_float(ctr_score),
+                "percentile": int(ctr_percentile) if ctr_percentile is not None else None,
+                "percentile_available": ctr_percentile is not None,
+            },
+            "heatmap_base64": _rgb_array_to_base64(heatmap_array),
+            "similar": [
+                {
+                    "rank": int(item.get("rank", index + 1)),
+                    "dataset_key": str(item.get("dataset_key", "")),
+                    "dataset_name": str(item.get("dataset_name", "")),
+                    "img_name": str(item.get("img_name", "")),
+                    "similarity": _to_float(item.get("similarity", 0.0)),
+                    "relative_ctr": _to_float(item.get("relative_ctr", 0.0)),
+                    "price": _to_float(item.get("price", 0.0)),
+                    "img_base64": _similar_image_to_base64(item.get("img_path")),
+                }
+                for index, item in enumerate(similar_items[: config.TOP_K_SIMILAR])
+            ],
+            "advice": [
+                {
+                    "priority": str(item.get("priority", "")),
+                    "category": str(item.get("category", "")),
+                    "issue": str(item.get("issue", "")),
+                    "suggestion": str(item.get("suggestion", "")),
+                }
+                for item in advice
+            ],
+            "psychological_report": {
+                "lines": [str(line) for line in psychological_report.get("lines", [])],
+                "text": str(psychological_report.get("text", "")),
+            },
+            "warnings": warnings,
+        }
+        return response
+    finally:
+        if temp_image_path is not None:
+            try:
+                temp_image_path.unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
