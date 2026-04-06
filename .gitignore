@@ -3,3 +3,7 @@ __pycache__/
 .env
 .env.*
 config.local.py
+.venv/
+venv/
+.cache/
+*.npy
