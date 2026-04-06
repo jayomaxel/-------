@@ -1,4 +1,4 @@
-# AI Analysis Addendum
+﻿# AI Analysis Addendum
 
 - Process note: this README should be updated together with each implementation step.
 - Current feature progress:

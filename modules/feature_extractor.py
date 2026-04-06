@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import functools
 
@@ -53,7 +53,7 @@ def _compute_entropy(image_rgb_uint8: np.ndarray) -> float:
 def _compute_contrast(image_rgb_uint8: np.ndarray) -> float:
     lab = cv2.cvtColor(image_rgb_uint8, cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
 
-    # Convert OpenCV LAB scale to approximate CIELAB scale for Delta-E distance.
+    # 先把 OpenCV 的 LAB 范围换算到常见的 CIELAB 近似范围。
     lab[:, 0] = lab[:, 0] * (100.0 / 255.0)
     lab[:, 1] = lab[:, 1] - 128.0
     lab[:, 2] = lab[:, 2] - 128.0

@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnalysisTone } from '../../api/ai';
 import AIAnalysisCard from '../../components/AIAnalysisCard';
 import AIAnalysisSetupModal from '../../components/AIAnalysisSetupModal';
@@ -69,7 +69,7 @@ function loadSavedTone(): AnalysisTone {
       return savedTone;
     }
   } catch {
-    // Ignore localStorage access errors.
+    // 某些浏览器模式下可能拿不到本地存储，这里直接回退默认值。
   }
 
   return 'professional';
@@ -246,8 +246,8 @@ export function DemoPage() {
     try {
       window.localStorage.setItem(AI_TONE_STORAGE_KEY, aiTone);
       window.localStorage.setItem(AI_API_KEY_STORAGE_KEY, aiApiKey);
-    } catch {
-      // Ignore localStorage access errors.
+  } catch {
+      // 本地存储失败不影响本次分析流程。
     }
 
     setAiConfigOpen(false);
@@ -265,18 +265,20 @@ export function DemoPage() {
   const topProducts = result?.similar ?? [];
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50">
-      <div className="mx-auto flex h-full max-w-[1800px] flex-col px-6 pb-6 pt-3 xl:px-12 xl:pb-12 xl:pt-4">
-        <div className="shrink-0 border-b border-white/60 bg-gray-50/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-gray-50/80 xl:py-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-20 border-b border-white/60 bg-gray-50/95 backdrop-blur supports-[backdrop-filter]:bg-gray-50/80">
+        <div className="mx-auto max-w-[1800px] px-4 py-3 sm:px-6 lg:px-8 xl:px-12 xl:py-4">
           <h1 className="mb-2 text-3xl font-black text-gray-900 xl:text-4xl">
             {TEXT.pageTitle}
           </h1>
           <p className="text-base text-gray-600 xl:text-lg">{TEXT.pageSubtitle}</p>
         </div>
+      </div>
 
-        <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto pt-6 xl:overflow-hidden">
-          <div className="grid gap-8 xl:h-full xl:min-h-0 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
-            <aside className="space-y-6 xl:self-start xl:pr-2">
+      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-6 sm:px-6 lg:px-8 xl:px-12 xl:pb-12">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] xl:gap-8 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
+          <aside className="lg:sticky lg:top-24 xl:top-28">
+            <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-md sm:p-6">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -288,7 +290,7 @@ export function DemoPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center shadow-sm transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-md"
+                className="w-full rounded-xl border-2 border-dashed border-gray-300 bg-white p-6 text-center shadow-sm transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-md sm:p-8"
               >
                 <div className="flex flex-col items-center gap-4">
                   <i
@@ -344,12 +346,13 @@ export function DemoPage() {
                   {displayError}
                 </div>
               ) : null}
-            </aside>
+            </div>
+          </aside>
 
-            <main className="min-w-0 space-y-8 overflow-x-hidden pb-12 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-3 xl:pb-20">
-              <div className="flex flex-col gap-4 md:flex-row">
-                <div className="w-full md:w-1/3">
-                  <div className="flex h-full min-h-[220px] flex-col justify-center rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-xl">
+          <main className="min-w-0 space-y-6 xl:space-y-8">
+            <div className="grid gap-4 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] xl:gap-6">
+              <div>
+                <div className="flex h-full min-h-[180px] flex-col justify-center rounded-2xl border border-gray-200 bg-white p-5 shadow-md transition-all hover:shadow-xl sm:min-h-[220px] sm:p-6">
                     <h3 className="mb-2 text-sm font-medium text-gray-500">
                       {TEXT.ctrPredictionScore}
                     </h3>
@@ -360,20 +363,20 @@ export function DemoPage() {
                   </div>
                 </div>
 
-                <div className="w-full md:w-2/3">
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-xl">
+              <div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md transition-all hover:shadow-xl sm:p-6">
                     <h3 className="mb-4 text-lg font-bold text-gray-800">
                       {TEXT.occlusionHeatmapAnalysis}
                     </h3>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-                      <div className="flex-1 text-center">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="text-center">
                         <p className="mb-2 text-sm text-gray-500">{TEXT.originalImage}</p>
-                        <div className="flex min-h-[260px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex min-h-[220px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-4 sm:min-h-[260px]">
                           {previewUrl ? (
                             <img
                               src={previewUrl}
                               alt={TEXT.originalImageAlt}
-                              className="max-h-[240px] w-full object-contain"
+                              className="max-h-[240px] w-full object-contain sm:max-h-[280px]"
                             />
                           ) : (
                             <div className="flex h-full min-h-[240px] w-full items-center justify-center">
@@ -387,12 +390,12 @@ export function DemoPage() {
                         </div>
                       </div>
 
-                      <div className="flex-1 text-center">
+                      <div className="text-center">
                         <p className="mb-2 text-sm text-gray-500">{TEXT.algorithmOutput}</p>
                         {previewUrl && result?.heatmap_base64 ? (
                           <HeatmapOverlay heatmapBase64={result.heatmap_base64} />
                         ) : (
-                          <div className="flex min-h-[260px] items-center justify-center rounded-lg border border-gray-200 bg-gradient-to-br from-red-200 via-yellow-200 to-green-200 p-4">
+                          <div className="flex min-h-[220px] items-center justify-center rounded-lg border border-gray-200 bg-gradient-to-br from-red-200 via-yellow-200 to-green-200 p-4 sm:min-h-[260px]">
                             <div className="text-center">
                               <div className="flex items-center justify-center gap-2 text-xs font-bold">
                                 <div className="flex items-center gap-1">
@@ -417,7 +420,7 @@ export function DemoPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-xl">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md transition-all hover:shadow-xl sm:p-6">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-800">
                   <i
                     data-lucide="trending-up"
@@ -426,9 +429,9 @@ export function DemoPage() {
                   />
                   {TEXT.visualFeatureAnalysis}
                 </h3>
-                <div className="flex flex-col items-center gap-6 md:flex-row">
-                  <div className="flex w-full justify-center md:w-2/5">
-                    <div className="h-[280px] w-[280px] max-w-full">
+                <div className="grid gap-6 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)] lg:items-center">
+                  <div className="flex justify-center">
+                    <div className="h-[240px] w-full max-w-[280px] sm:h-[280px] sm:max-w-[320px]">
                       {radarData.length ? (
                         <canvas ref={radarCanvasRef} style={{ width: '100%', height: '100%' }} />
                       ) : (
@@ -439,11 +442,11 @@ export function DemoPage() {
                     </div>
                   </div>
 
-                  <div className="w-full md:w-3/5">
+                  <div className="w-full">
                     {result ? (
                       <FeaturePanel features={result.features} />
                     ) : (
-                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
                         {EMPTY_RADAR_DATA.map((item) => (
                           <div
                             key={item.key}
@@ -473,7 +476,7 @@ export function DemoPage() {
                 onOpenConfig={handleOpenAIConfig}
               />
 
-              <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-md transition-all hover:shadow-xl">
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-md transition-all hover:shadow-xl sm:p-8">
                 <SimilarList
                   items={
                     topProducts.length
@@ -487,9 +490,8 @@ export function DemoPage() {
                         }))
                   }
                 />
-              </div>
-            </main>
-          </div>
+            </div>
+          </main>
         </div>
       </div>
 

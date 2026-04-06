@@ -1,23 +1,4 @@
-"""
-File Purpose:
-    Load dataset metadata/CLIP vectors and retrieve top-k similar images for a query vector.
-
-Main Functions:
-    - load_dataset_vectors(dataset_key: str = config.DEFAULT_DATASET) -> tuple[np.ndarray, pd.DataFrame]
-    - load_retrieval_corpus(dataset_key: str | None = config.RETRIEVAL_DATASET_KEY)
-      -> tuple[np.ndarray, pd.DataFrame]
-    - retrieve_similar(
-        query_vector: np.ndarray,
-        dataset_key: str | None = config.RETRIEVAL_DATASET_KEY,
-        top_k: int = config.TOP_K_SIMILAR
-      ) -> list[dict]
-
-Input / Output Types:
-    - Input query vector: np.ndarray, expected shape (512,) or flattenable to 512.
-    - Cached dataset vectors: np.ndarray, shape (N, 512), dtype float32/float64.
-    - Dataset table: pandas.DataFrame loaded from configured Excel file.
-    - Retrieval output: list[dict] with rank/img_name/img_path/similarity/relative_ctr/price.
-"""
+﻿"""相似竞品检索。"""
 
 from pathlib import Path
 import functools
@@ -33,13 +14,13 @@ IMAGES_DIR_COL = "__images_dir"
 
 
 def _round4(value: float) -> float:
-    """Round a numeric value to 4 decimals and return Python float."""
+    """保留 4 位小数。"""
     rounded = float(np.round(float(value), 4))
     return 0.0 if rounded == 0.0 else rounded
 
 
 def _resolve_path(path_value: str) -> Path:
-    """Resolve a configured relative/absolute path to an absolute Path."""
+    """把配置里的路径统一转成绝对路径。"""
     path_obj = Path(path_value)
     if path_obj.is_absolute():
         return path_obj
@@ -47,7 +28,7 @@ def _resolve_path(path_value: str) -> Path:
 
 
 def _get_dataset_config(dataset_key: str) -> dict:
-    """Validate dataset key and return configured dataset block."""
+    """校验并返回数据集配置。"""
     if dataset_key not in config.DATASETS:
         valid_keys = ", ".join(config.DATASETS.keys())
         raise ValueError(
@@ -57,7 +38,7 @@ def _get_dataset_config(dataset_key: str) -> dict:
 
 
 def _normalize_dataset_keys(dataset_key: str | None) -> tuple[str, ...]:
-    """Resolve a retrieval scope into one or more configured dataset keys."""
+    """把检索范围展开成一个或多个数据集 key。"""
     if dataset_key is None:
         return tuple(config.DATASETS.keys())
 
@@ -70,7 +51,7 @@ def _normalize_dataset_keys(dataset_key: str | None) -> tuple[str, ...]:
 
 
 def _safe_float(value: object) -> float:
-    """Convert value to float safely; return 0.0 if conversion fails or NaN."""
+    """安全转成 float，失败时返回 0。"""
     try:
         number = float(value)
         if np.isnan(number):
@@ -84,24 +65,7 @@ def _safe_float(value: object) -> float:
 def load_dataset_vectors(
     dataset_key: str = config.DEFAULT_DATASET,
 ) -> tuple[np.ndarray, pd.DataFrame]:
-    """
-    Load dataset Excel rows and precomputed CLIP vectors for a specific dataset key.
-
-    Args:
-        dataset_key: Dataset key registered in `config.DATASETS`, for example
-            `config.DEFAULT_DATASET` or `"功能性饮料"`.
-
-    Returns:
-        tuple[np.ndarray, pd.DataFrame]:
-            - vectors: CLIP vector matrix with shape (N, 512)
-            - dataframe: dataset rows loaded from configured Excel file
-
-    Raises:
-        ValueError: If dataset_key is invalid or vector/dataframe shapes mismatch.
-        FileNotFoundError: If configured files are missing. For vector cache miss,
-            prompts user to run `precompute_vectors.py`.
-        RuntimeError: If file reading fails for other reasons.
-    """
+    """读取单个数据集的 Excel 和 CLIP 向量缓存。"""
     dataset_cfg = _get_dataset_config(dataset_key)
 
     excel_path = _resolve_path(dataset_cfg["excel_path"])
@@ -162,7 +126,7 @@ def load_dataset_vectors(
 def _load_retrieval_corpus_cached(
     dataset_keys: tuple[str, ...],
 ) -> tuple[np.ndarray, pd.DataFrame]:
-    """Load and merge one or more configured datasets into a single retrieval corpus."""
+    """把多个数据集合并成一个检索语料库。"""
     vector_parts: list[np.ndarray] = []
     dataframe_parts: list[pd.DataFrame] = []
 
@@ -189,19 +153,7 @@ def _load_retrieval_corpus_cached(
 def load_retrieval_corpus(
     dataset_key: str | None = config.RETRIEVAL_DATASET_KEY,
 ) -> tuple[np.ndarray, pd.DataFrame]:
-    """
-    Load the retrieval corpus for one dataset or the full cross-category corpus.
-
-    Args:
-        dataset_key:
-            - specific dataset key in `config.DATASETS`
-            - `"all"` / `None` to merge all configured datasets
-
-    Returns:
-        tuple[np.ndarray, pd.DataFrame]:
-            - vectors: CLIP vector matrix with shape (N, 512)
-            - dataframe: merged dataset rows enriched with dataset metadata columns
-    """
+    """读取单个数据集或全量数据集的检索语料。"""
     dataset_keys = _normalize_dataset_keys(dataset_key)
     return _load_retrieval_corpus_cached(dataset_keys)
 
@@ -211,30 +163,7 @@ def retrieve_similar(
     dataset_key: str | None = config.RETRIEVAL_DATASET_KEY,
     top_k: int = config.TOP_K_SIMILAR,
 ) -> list[dict]:
-    """
-    Retrieve top-k similar items by cosine similarity using vectorized numpy operations.
-
-    Args:
-        query_vector: Query CLIP vector, expected shape (512,) or flattenable to 512.
-        dataset_key:
-            - specific dataset key in `config.DATASETS`
-            - `"all"` / `None` to search across all configured datasets
-        top_k: Number of top results to return.
-
-    Returns:
-        list[dict]: Ranked retrieval results. Each item includes:
-            - rank (int)
-            - img_name (str, from config.COL_IMG_NAME)
-            - img_path (str | None, resolved local path if file exists)
-            - similarity (float, 4 decimals)
-            - relative_ctr (float, from config.COL_CTR)
-            - price (float, from config.COL_PRICE_RAW)
-
-    Raises:
-        ValueError: If query vector shape is invalid, norm is zero, or dataset key invalid.
-        FileNotFoundError: If required dataset files are missing.
-        RuntimeError: If underlying file loading fails.
-    """
+    """按余弦相似度返回前 top-k 个结果。"""
     vectors, dataframe = load_retrieval_corpus(dataset_key)
 
     query = np.asarray(query_vector, dtype=np.float32).reshape(-1)
@@ -247,7 +176,7 @@ def retrieve_similar(
     if query_norm == 0.0:
         raise ValueError("Query vector norm is zero; cannot compute cosine similarity.")
 
-    # Vectorized cosine similarity: sim = (A · B^T) / (||A|| · ||B||)
+    # 一次性算完整个向量库的余弦相似度，避免逐条循环。
     dot_values = vectors @ query
     vector_norms = np.linalg.norm(vectors, axis=1)
     denominator = vector_norms * query_norm

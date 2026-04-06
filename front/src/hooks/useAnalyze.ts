@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+﻿import { useCallback, useState } from 'react';
 import { analyzeImage, type AnalyzeResponse } from '../api/analyze';
 
 interface UseAnalyzeReturn {

@@ -1,4 +1,4 @@
-import type { AnalysisTone } from '../api/ai';
+﻿import type { AnalysisTone } from '../api/ai';
 
 interface AIAnalysisSetupModalProps {
   open: boolean;

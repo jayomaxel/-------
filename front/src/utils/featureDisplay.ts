@@ -1,4 +1,4 @@
-import type { AnalyzeFeatures } from '../api/analyze';
+﻿import type { AnalyzeFeatures } from '../api/analyze';
 
 export type FeatureKey = keyof AnalyzeFeatures;
 

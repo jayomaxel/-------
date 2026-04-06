@@ -1,4 +1,4 @@
-import type { SimilarItem } from '../api/analyze';
+﻿import type { SimilarItem } from '../api/analyze';
 
 interface SimilarListProps {
   items: SimilarItem[];
@@ -82,6 +82,7 @@ export function SimilarList({ items }: SimilarListProps) {
           基准：同类竞品平均 CTR = 1.0，数值越大说明相对点击表现越强。
         </p>
       </div>
+
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
         {items.map((item) => {
           const relativeCtrMeta = getRelativeCtrMeta(item.relative_ctr);
@@ -110,12 +111,12 @@ export function SimilarList({ items }: SimilarListProps) {
               </div>
 
               <div className="space-y-3 text-sm">
-                <div className="text-sm font-bold text-gray-700">相似竞品 #{item.rank}</div>
                 {item.dataset_name ? (
                   <div className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
                     {item.dataset_name}
                   </div>
                 ) : null}
+
                 <p className="flex justify-between font-bold">
                   <span className="text-gray-600">相似度</span>
                   <span className="text-blue-600">
@@ -129,7 +130,7 @@ export function SimilarList({ items }: SimilarListProps) {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold text-gray-600">
-                      CTR相对行业均值
+                      CTR 相对行业均值
                     </span>
                     <span
                       className={`rounded-full px-2 py-1 text-[11px] font-semibold ${relativeCtrMeta.badgeClassName}`}
@@ -137,9 +138,11 @@ export function SimilarList({ items }: SimilarListProps) {
                       {relativeCtrMeta.label}
                     </span>
                   </div>
+
                   <div className={`mt-3 text-2xl font-black ${relativeCtrMeta.valueClassName}`}>
                     {formatRelativeCtrValue(item.relative_ctr)}
                   </div>
+
                   <p className="mt-1 text-xs leading-5 text-gray-600">
                     {describeRelativeCtr(item.relative_ctr)}
                   </p>

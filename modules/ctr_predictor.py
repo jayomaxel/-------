@@ -1,11 +1,4 @@
-"""
-CTR prediction adapter for the shipped XGBoost artifacts.
-
-Runtime priority:
-1. Use the 517-dimension global model from `heatmap/`
-2. Fall back to the legacy 514-dimension dataset-specific bundle when available
-3. Fall back to a mock score when neither bundle is usable
-"""
+﻿"""CTR 预测适配层。"""
 
 from __future__ import annotations
 
@@ -173,20 +166,7 @@ def predict_ctr(
     dataset_key: str = config.DEFAULT_DATASET,
     return_details: bool = False,
 ) -> tuple[float, int | None] | tuple[float, int | None, dict[str, object]]:
-    """
-    Predict CTR score and percentile from extracted image features.
-
-    Args:
-        features: Feature dict returned by `extract_features()`.
-        dataset_key: Dataset key used for legacy-model fallback only.
-        return_details: When true, include degradation metadata for the caller.
-
-    Returns:
-        `(score, percentile)` by default, or `(score, percentile, details)` when
-        `return_details=True`. `percentile` is intentionally `None` because the
-        shipped model only provides a raw regression score and this service does not
-        ship a real percentile ranking baseline.
-    """
+    """根据提取后的特征预测 CTR。"""
 
     global_bundle = _load_global_bundle()
     if global_bundle is not None:

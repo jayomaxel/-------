@@ -1,26 +1,11 @@
-# -*- coding: utf-8 -*-
-"""
-File Purpose:
-    Rule-based optimization advisor for product main image diagnosis.
-
-Main Function:
-    - generate_advice(features: dict, ctr_score: float, ctr_percentile: int) -> list[dict]
-
-Input / Output Types:
-    - Input:
-        features: dict from feature_extractor (entropy/contrast/text_density/brightness/etc.)
-        ctr_score: float
-        ctr_percentile: int in [0, 100] or None
-    - Output:
-        list[dict], each item contains:
-        {"priority": str, "category": str, "issue": str, "suggestion": str}
-"""
+﻿# -*- coding: utf-8 -*-
+"""基于规则生成主图优化建议。"""
 
 import config
 
 
 def _to_float(value: object, default: float = 0.0) -> float:
-    """Safely convert any value to float."""
+    """把值转成 float，失败时返回默认值。"""
     try:
         return float(value)
     except Exception:
@@ -28,7 +13,7 @@ def _to_float(value: object, default: float = 0.0) -> float:
 
 
 def _to_int(value: object, default: int = 0) -> int:
-    """Safely convert any value to int."""
+    """把值转成 int，失败时返回默认值。"""
     try:
         return int(value)
     except Exception:
@@ -45,26 +30,7 @@ def _to_optional_int(value: object) -> int | None:
 
 
 def generate_advice(features: dict, ctr_score: float, ctr_percentile: int | None) -> list[dict]:
-    """
-    Generate ordered optimization advice based on visual features and CTR ranking.
-
-    Args:
-        features: Feature dictionary returned by `extract_features`, expected keys include
-            `entropy`, `contrast`, `text_density`, and `brightness`.
-        ctr_score: Predicted CTR raw score.
-        ctr_percentile: Percentile rank within dataset (0~100), if available.
-
-    Returns:
-        list[dict]: Advice list sorted by priority order `高 -> 中 -> 低`.
-            Each dict contains:
-            - priority: "高" | "中" | "低"
-            - category: issue category
-            - issue: detected problem text
-            - suggestion: optimization recommendation text
-
-    Raises:
-        None. This function is fail-safe and returns at least one low-priority advice.
-    """
+    """按优先级返回主图优化建议。"""
     entropy = _to_float(features.get("entropy", 0.0))
     contrast = _to_float(features.get("contrast", 0.0))
     text_density = _to_float(features.get("text_density", 0.0))

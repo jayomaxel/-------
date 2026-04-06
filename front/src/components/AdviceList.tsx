@@ -1,4 +1,4 @@
-import type { AdviceItem } from '../api/analyze';
+﻿import type { AdviceItem } from '../api/analyze';
 
 const priorityColor: Record<string, string> = {
   高: '#ff4d4f',

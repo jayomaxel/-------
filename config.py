@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-# Project root directory
+# 项目根目录
 ROOT_DIR = Path(__file__).resolve().parent
 
-# Cache/model paths
+# 缓存和模型路径
 CACHE_DIR = "cache"
 GLOBAL_MODEL_PATH = "heatmap/ctr_xgboost_model_global.pkl"
 GLOBAL_SCALER_PATH = "heatmap/ctr_feature_scaler.pkl"
@@ -31,14 +31,14 @@ def _build_dataset_config(
         "img_prefix": img_prefix,
         "sample_size": sample_size,
         "cache_vectors": f"{CACHE_DIR}/{slug}_clip_vectors.npy",
-        # The shipped heatmap / CTR artifacts are trained on a mixed six-category dataset.
+        # 当前随仓库提供的热力图和 CTR 文件都使用混合类目模型。
         "model_path": GLOBAL_MODEL_PATH,
         "scaler_path": GLOBAL_SCALER_PATH,
     }
 
 
-# Dataset registry used for retrieval resources / cache generation.
-# Frontend does not need dataset switching because inference uses the global mixed-category model.
+# 数据集配置，用于检索和向量缓存。
+# 前端不切换数据集，推理统一走全局混合类目模型。
 DATASETS = {
     "功能性饮料": _build_dataset_config(
         slug="drink",
@@ -84,37 +84,37 @@ DATASETS = {
     ),
 }
 
-# Default dataset key used by internal module defaults.
+# 模块默认数据集
 DEFAULT_DATASET = "功能性饮料"
 RETRIEVAL_DATASET_KEY = "all"
 
-# Legacy aliases (kept for backward compatibility with older scripts).
+# 兼容旧脚本的别名
 DATA_DIR = DATASETS[DEFAULT_DATASET]["data_dir"]
 EXCEL_PATH = DATASETS[DEFAULT_DATASET]["excel_path"]
 IMAGES_DIR = DATASETS[DEFAULT_DATASET]["images_dir"]
 
-# Cache/model paths (legacy single-dataset style)
+# 兼容旧版单数据集路径
 CLIP_VECTORS_PATH = DATASETS[DEFAULT_DATASET]["cache_vectors"]
 LEGACY_MODEL_PATH = DATASETS[DEFAULT_DATASET]["model_path"]
 LEGACY_SCALER_PATH = DATASETS[DEFAULT_DATASET]["scaler_path"]
 MODEL_PATH = GLOBAL_MODEL_PATH
 SCALER_PATH = GLOBAL_SCALER_PATH
 
-# Image preprocessing
+# 图像预处理
 IMG_SIZE = (224, 224)
 IMG_MEAN = (0.48145466, 0.4578275, 0.40821073)
 IMG_STD = (0.26862954, 0.26130258, 0.27577711)
 
-# CLIP model
+# CLIP 模型
 CLIP_MODEL_NAME = "ViT-B/32"
-CLIP_DEVICE = "cpu"  # Change to "cuda" if you have GPU support
+CLIP_DEVICE = "cpu"  # 有 GPU 时可改成 "cuda"
 CLIP_DIM = 512
 
-# Similar retrieval
+# 相似图检索
 TOP_K_SIMILAR = 5
 SIMILARITY_EXCLUDE_EQ = True
 
-# Advisor thresholds
+# 建议生成阈值
 ENTROPY_HIGH = 7.0
 ENTROPY_LOW = 3.5
 CONTRAST_LOW = 20.0
@@ -125,7 +125,7 @@ BRIGHTNESS_HIGH = 0.90
 CTR_PCT_LOW = 30
 CTR_PCT_MID = 60
 
-# Excel column names
+# Excel 列名
 COL_IMG_URL = "商品主图"
 COL_TITLE = "商品名称"
 COL_PRICE_RAW = "价格_清洗"
@@ -136,7 +136,7 @@ COL_CLICK_VOL = "click_volume"
 COL_CTR = "relative_ctr"
 COL_IMG_NAME = "std_img_name"
 
-# Feature vector layouts for CTR model input
+# CTR 模型特征布局
 LEGACY_FEATURE_SCALAR_COLS = ["entropy", "text_density"]
 LEGACY_FEATURE_DIM = len(LEGACY_FEATURE_SCALAR_COLS) + CLIP_DIM
 
@@ -152,7 +152,7 @@ GLOBAL_FEATURE_DIM = len(GLOBAL_FEATURE_SCALAR_COLS) + CLIP_DIM
 FEATURE_SCALAR_COLS = GLOBAL_FEATURE_SCALAR_COLS
 FEATURE_DIM = GLOBAL_FEATURE_DIM
 
-# Training-related constants (kept for compatibility)
+# 训练相关常量，保留给旧流程使用
 TRAIN_TEST_SPLIT = 0.2
 RANDOM_STATE = 42
 CTR_ZERO_EXCLUDE = True
@@ -164,7 +164,7 @@ XGB_PARAMS = {
     "verbosity": 1,
 }
 
-# AI analysis config
+# AI 分析配置
 AI_MODEL_BASE_URL = os.getenv("AI_MODEL_BASE_URL", "https://api.deepseek.com")
 AI_MODEL_API_KEY = os.getenv("AI_MODEL_API_KEY", "YOUR_API_KEY")
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "deepseek-chat")
