@@ -14,19 +14,43 @@ DEFAULT_TONE = "professional"
 TONE_STYLES: dict[str, dict[str, str]] = {
     "professional": {
         "label": "Professional",
-        "instruction": "Use a professional, objective, consultant-like tone.",
+        "instruction": (
+            "Use a professional, objective, consultant-like tone. "
+            "Ground every key finding in cognitive psychology: cite Cognitive Load Theory "
+            "when discussing visual complexity, Information Overload when discussing text density, "
+            "Selective Attention when discussing saliency distribution, and Center Bias "
+            "when discussing subject positioning. Tag each major claim with the theory name."
+        ),
     },
     "encouraging": {
         "label": "Encouraging",
-        "instruction": "Use a warm, supportive, constructive tone.",
+        "instruction": (
+            "Use a warm, supportive, constructive tone. "
+            "Frame cognitive psychology insights as friendly tips: e.g., 'Your image keeps "
+            "cognitive load nicely balanced' for strengths, or 'Users' brains tend to prefer "
+            "a single focal point' for improvements. Always connect data to how the user's "
+            "brain naturally processes the image."
+        ),
     },
     "direct": {
         "label": "Direct",
-        "instruction": "Use a direct, sharp, no-fluff tone without being rude.",
+        "instruction": (
+            "Use a direct, sharp, no-fluff tone without being rude. "
+            "State cognitive psychology verdicts bluntly: 'Cognitive overload — entropy too high', "
+            "'Decision paralysis risk — text density exceeds threshold', "
+            "'Attention split — no single saliency anchor'. "
+            "Every claim must have a concrete theory backing it."
+        ),
     },
     "strategic": {
         "label": "Strategic",
-        "instruction": "Use a strategy-director tone that emphasizes priorities and business impact.",
+        "instruction": (
+            "Use a strategy-director tone that emphasizes priorities and business impact. "
+            "Frame cognitive psychology as competitive levers: reducing cognitive load shortens "
+            "the click decision path, center bias compliance captures first-fixation advantage, "
+            "controlling information overload prevents decision paralysis in the feed. "
+            "Prioritize suggestions by estimated CTR impact."
+        ),
     },
 }
 
@@ -186,11 +210,17 @@ def _extract_message_text(content: Any) -> str:
 def _build_messages(analysis_summary: Mapping[str, Any], tone: str) -> list[dict[str, str]]:
     tone_config = TONE_STYLES.get(tone, TONE_STYLES[DEFAULT_TONE])
     system_prompt = (
-        "You are an e-commerce main-image diagnosis assistant. "
+        "You are an e-commerce main-image cognitive diagnosis assistant grounded in "
+        "four psychological theories: Cognitive Load Theory, Information Overload Theory, "
+        "Selective Attention Theory, and Center Bias Theory. "
+        "Map every visual feature to its cognitive mechanism: entropy→cognitive load, "
+        "text_density→information overload, subject positioning→center bias, "
+        "contrast/saturation→selective attention. "
         "Use only the provided structured analysis data. "
         "Do not invent visual details that are not supported by the data. "
         "Write the final answer in Simplified Chinese. "
-        "The report must cover overall judgment, key issues, and actionable optimization directions. "
+        "The report must cover: overall cognitive judgment, key psychological issues, "
+        "and theory-grounded optimization directions. "
         "Do not output JSON, tables, or code blocks."
     )
     user_prompt = (

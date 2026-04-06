@@ -1,11 +1,15 @@
 ﻿const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000';
 
+const ANALYZE_RETRY_DELAY_MS = 800;
+const BACKEND_READY_TIMEOUT_MS = 12000;
+const BACKEND_READY_POLL_MS = 500;
+
 export interface AnalyzeFeatures {
-  entropy: number;
-  text_density: number;
-  brightness: number;
-  contrast: number;
-  saturation: number;
+  entropy?: number;
+  text_density?: number;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
   subject_area_ratio?: number;
   edge_density?: number;
   color_saturation?: number;
@@ -50,14 +54,58 @@ export interface AnalyzeResponse {
   warnings?: string[];
 }
 
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
+async function waitForBackendReady(
+  timeoutMs = BACKEND_READY_TIMEOUT_MS,
+  pollMs = BACKEND_READY_POLL_MS,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${API_BASE}/health`);
+      if (res.ok) {
+        const data = (await res.json().catch(() => null)) as { status?: string } | null;
+        if (data?.status === 'ok') {
+          return true;
+        }
+      }
+    } catch {
+      // 后端还没起来时这里会失败，继续轮询即可。
+    }
+
+    await sleep(pollMs);
+  }
+
+  return false;
+}
+
 export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE}/analyze`, {
-    method: 'POST',
-    body: formData,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/analyze`, {
+      method: 'POST',
+      body: formData,
+    });
+  } catch (error) {
+    const backendReady = await waitForBackendReady();
+    if (!backendReady) {
+      throw error;
+    }
+
+    await sleep(ANALYZE_RETRY_DELAY_MS);
+    res = await fetch(`${API_BASE}/analyze`, {
+      method: 'POST',
+      body: formData,
+    });
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: '未知错误' }));
@@ -66,17 +114,35 @@ export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
 
   const data = (await res.json()) as Partial<AnalyzeResponse>;
 
+  const features: AnalyzeFeatures = {
+    ...(typeof data.features?.entropy === 'number'
+      ? { entropy: data.features.entropy }
+      : {}),
+    ...(typeof data.features?.text_density === 'number'
+      ? { text_density: data.features.text_density }
+      : {}),
+    ...(typeof data.features?.brightness === 'number'
+      ? { brightness: data.features.brightness }
+      : {}),
+    ...(typeof data.features?.contrast === 'number'
+      ? { contrast: data.features.contrast }
+      : {}),
+    ...(typeof data.features?.saturation === 'number'
+      ? { saturation: data.features.saturation }
+      : {}),
+    ...(typeof data.features?.subject_area_ratio === 'number'
+      ? { subject_area_ratio: data.features.subject_area_ratio }
+      : {}),
+    ...(typeof data.features?.edge_density === 'number'
+      ? { edge_density: data.features.edge_density }
+      : {}),
+    ...(typeof data.features?.color_saturation === 'number'
+      ? { color_saturation: data.features.color_saturation }
+      : {}),
+  };
+
   return {
-    features: {
-      entropy: data.features?.entropy ?? 0,
-      text_density: data.features?.text_density ?? 0,
-      brightness: data.features?.brightness ?? 0,
-      contrast: data.features?.contrast ?? 0,
-      saturation: data.features?.saturation ?? 0,
-      subject_area_ratio: data.features?.subject_area_ratio ?? 0,
-      edge_density: data.features?.edge_density ?? 0,
-      color_saturation: data.features?.color_saturation ?? 0,
-    },
+    features,
     ctr: {
       score: data.ctr?.score ?? 0.5,
       percentile: data.ctr?.percentile ?? null,
@@ -104,9 +170,7 @@ export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/health`);
-    const data = await res.json();
-    return data.status === 'ok';
+    return await waitForBackendReady(BACKEND_READY_POLL_MS, BACKEND_READY_POLL_MS);
   } catch {
     return false;
   }

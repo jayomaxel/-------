@@ -23,7 +23,12 @@ export function useAnalyze(): UseAnalyzeReturn {
       const data = await analyzeImage(file);
       setResult(data);
     } catch (err: any) {
-      setError(err.message ?? '分析失败，请检查后端是否启动');
+      const rawMessage = String(err?.message ?? '').trim();
+      const friendlyMessage =
+        rawMessage === 'Failed to fetch'
+          ? '分析请求没有连上后端，可能是服务刚启动还没完全就绪，请稍等一秒再试。'
+          : rawMessage || '分析失败，请检查后端是否启动';
+      setError(friendlyMessage);
     } finally {
       setLoading(false);
     }

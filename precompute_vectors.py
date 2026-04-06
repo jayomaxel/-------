@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 import config
-from modules import feature_extractor, preprocessor
+from modules.reference_pipeline import get_clip_feature
 
 
 def _resolve_path(path_value: str) -> Path:
@@ -21,21 +21,9 @@ def _resolve_path(path_value: str) -> Path:
     return (config.ROOT_DIR / path_obj).resolve()
 
 
-def _to_uint8_rgb(image_array: np.ndarray) -> np.ndarray:
-    """把预处理后的浮点图像转回 uint8 RGB。"""
-    if image_array.ndim != 3 or image_array.shape[2] != 3:
-        raise ValueError(f"Invalid image shape: {image_array.shape}, expected (H, W, 3)")
-    return (np.clip(image_array, 0.0, 1.0) * 255.0).astype(np.uint8)
-
-
-def _extract_clip_vector_only(preprocessed_image: np.ndarray) -> np.ndarray:
-    """只提取 CLIP 向量，不计算其他特征。"""
-    clip_extractor = getattr(feature_extractor, "_extract_clip_vector", None)
-    if clip_extractor is None:
-        raise RuntimeError("CLIP extractor is unavailable in modules.feature_extractor")
-
-    image_uint8 = _to_uint8_rgb(preprocessed_image)
-    vector = clip_extractor(image_uint8)
+def _extract_clip_vector_only(image_path: Path) -> np.ndarray:
+    """只提取 CLIP 向量，算法与 untitled7.py 同源。"""
+    vector = get_clip_feature(image_path)
     if not isinstance(vector, np.ndarray) or vector.shape != (512,):
         raise ValueError(f"Invalid CLIP vector shape: {getattr(vector, 'shape', None)}")
     return vector.astype(np.float32)
@@ -90,8 +78,7 @@ def process_dataset(dataset_key: str = config.DEFAULT_DATASET) -> dict:
                 print(f"[WARNING] 图片不存在: {image_path}，填充零向量")
             else:
                 try:
-                    processed_image = preprocessor.preprocess_image(image_path)
-                    vectors[idx - 1] = _extract_clip_vector_only(processed_image)
+                    vectors[idx - 1] = _extract_clip_vector_only(image_path)
                     success_count += 1
                 except Exception as exc:
                     skipped_count += 1

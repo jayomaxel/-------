@@ -18,12 +18,10 @@ from pydantic import BaseModel, Field
 import config
 from modules.advisor import generate_advice
 from modules.ai_analyzer import analyze_with_ai
-from modules.ctr_predictor import load_model_bundle, predict_ctr
-from modules.feature_extractor import extract_features
 from modules.heatmap import generate_heatmap
-from modules.preprocessor import preprocess_image
 from modules.reference_pipeline import (
     extract_reference_features,
+    predict_reference_ctr,
     generate_psychological_report,
 )
 from modules.retriever import load_retrieval_corpus, retrieve_similar
@@ -41,7 +39,7 @@ app.add_middleware(
 
 class AIAnalysisRequest(BaseModel):
     tone: str = Field(default="professional", description="语气风格")
-    features: dict[str, Any] = Field(..., description="/analyze 返回的 features 对象")
+    features: dict[str, Any] = Field(..., description="调用方传入的视觉特征对象")
     ctr_score: float = Field(..., description="CTR 预测分")
     api_key: str | None = Field(default=None, description="前端传入的 AI API Key")
 
@@ -114,14 +112,9 @@ def _similar_image_to_base64(img_path: str | None) -> str | None:
 
 
 def _build_readiness_components() -> dict[str, bool]:
-    ctr_bundle = load_model_bundle(config.DEFAULT_DATASET)
-    global_bundle_ready = ctr_bundle is not None and str(ctr_bundle.get("scope", "")).startswith(
-        "global"
-    )
-
     components: dict[str, bool] = {
-        "ctr_model": global_bundle_ready,
-        "ctr_scaler": global_bundle_ready,
+        "ctr_model": _resolve_path(config.MODEL_PATH).exists(),
+        "ctr_scaler": _resolve_path(config.SCALER_PATH).exists(),
         "vector_cache": all(
             _resolve_path(str(dataset_cfg["cache_vectors"])).exists()
             for dataset_cfg in config.DATASETS.values()
@@ -176,16 +169,7 @@ async def analyze(file: UploadFile = File(...)) -> Any:
 
             pil_image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
             image_array = np.array(pil_image)
-            processed_image = preprocess_image(image_array)
-            features = extract_features(
-                processed_image,
-                include_clip=False,
-                include_text_density=False,
-            )
-            reference_features = extract_reference_features(temp_image_path)
-            features.update(reference_features)
-            if _to_float(features.get("saturation", 0.0)) == 0.0:
-                features["saturation"] = _to_float(features.get("color_saturation", 0.0))
+            features = extract_reference_features(temp_image_path)
         except Exception as exc:  # noqa: BLE001
             return JSONResponse(
                 status_code=400,
@@ -193,11 +177,8 @@ async def analyze(file: UploadFile = File(...)) -> Any:
             )
 
         try:
-            ctr_score, ctr_percentile, ctr_details = predict_ctr(features, return_details=True)
-            if bool(ctr_details.get("degraded")):
-                reason = ctr_details.get("reason")
-                if isinstance(reason, str) and reason:
-                    warnings.append(reason)
+            ctr_score = predict_reference_ctr(features)
+            ctr_percentile = None
         except Exception:  # noqa: BLE001
             ctr_score, ctr_percentile = 0.5, None
             warnings.append("ctr_fallback_mock_value")
@@ -234,9 +215,6 @@ async def analyze(file: UploadFile = File(...)) -> Any:
             "features": {
                 "entropy": _to_float(features.get("entropy", 0.0)),
                 "text_density": _to_float(features.get("text_density", 0.0)),
-                "brightness": _to_float(features.get("brightness", 0.0)),
-                "contrast": _to_float(features.get("contrast", 0.0)),
-                "saturation": _to_float(features.get("saturation", 0.0)),
                 "subject_area_ratio": _to_float(features.get("subject_area_ratio", 0.0)),
                 "edge_density": _to_float(features.get("edge_density", 0.0)),
                 "color_saturation": _to_float(features.get("color_saturation", 0.0)),

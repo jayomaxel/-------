@@ -129,8 +129,10 @@ export function DemoPage() {
       return [];
     }
 
-    return FEATURE_CONFIG.map(({ key, label }) => {
-      const rawValue = Number(result.features[key] ?? 0);
+    return FEATURE_CONFIG.filter(
+      ({ key }) => typeof result.features[key] === 'number',
+    ).map(({ key, label }) => {
+      const rawValue = Number(result.features[key]);
 
       return {
         key,

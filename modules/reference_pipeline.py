@@ -242,33 +242,113 @@ def generate_psychological_report(reference_features: dict[str, object], predict
     text_density = float(reference_features.get("text_density", 0.0))
     subject_area_ratio = float(reference_features.get("subject_area_ratio", 0.0))
     color_saturation = float(reference_features.get("color_saturation", 0.0))
+    edge_density = float(reference_features.get("edge_density", 0.0))
 
     lines: list[str] = [f"预测 CTR 原始值: {predicted_ctr:.4f}"]
 
-    lines.append("1. 认知负荷理论分析")
-    if entropy > 7.5 or text_density > 0.3:
-        lines.append("画面元素偏多或文案偏密，用户在短时间内更容易产生认知负荷。")
-        lines.append("建议减少冗余装饰和文字，只保留 1 到 2 个核心卖点。")
+    lines.append("")
+    lines.append("【认知负荷理论分析】")
+    cognitive_load_high = entropy > config.ENTROPY_HIGH or text_density > config.TEXT_DENSITY_HIGH
+    if cognitive_load_high:
+        overload_factors = []
+        if entropy > config.ENTROPY_HIGH:
+            overload_factors.append(f"视觉熵({entropy:.2f})超出阈值({config.ENTROPY_HIGH})")
+        if text_density > config.TEXT_DENSITY_HIGH:
+            overload_factors.append(
+                f"文字密度({text_density:.2f})超出阈值({config.TEXT_DENSITY_HIGH})"
+            )
+        lines.append(
+            f"{'、'.join(overload_factors)}，视觉复杂度可能超出用户工作记忆容量，"
+            "增加内在认知负担，触发'避难趋易'本能，降低点击意愿。"
+        )
+        lines.append(
+            f"边缘密度当前为 {edge_density:.2f}，建议继续结合背景纹理观察是否在放大解析负担。"
+        )
+        lines.append("建议：精简背景元素与非核心文案，降低用户完成首轮理解时的视觉解析成本。")
+    elif entropy < config.ENTROPY_LOW:
+        lines.append(
+            f"视觉熵({entropy:.2f})低于阈值({config.ENTROPY_LOW})，"
+            "画面信息层次单一，缺乏吸引用户停留的视觉锚点。"
+        )
+        lines.append("建议：适度增加视觉层次感，如场景化背景或辅助元素，但避免过度堆砌。")
     else:
-        lines.append("视觉信息相对清爽，用户更容易快速抓住商品重点。")
+        lines.append(
+            f"视觉熵({entropy:.2f})与文字密度({text_density:.2f})未触发高负荷阈值，"
+            "整体认知负荷相对平稳。"
+        )
+        lines.append(
+            f"边缘密度当前为 {edge_density:.2f}，可继续关注背景纹理是否在局部削弱主体识别效率。"
+        )
 
-    lines.append("2. 主体视觉与图地关系分析")
-    if subject_area_ratio < 0.2:
-        lines.append("主体占比偏小，背景更容易分散注意力。")
-        lines.append("建议放大主体，或通过弱化背景边缘来突出商品。")
-    elif subject_area_ratio > 0.6:
-        lines.append("主体足够突出，能够较快形成视觉焦点。")
+    lines.append("")
+    lines.append("【信息过载理论分析】")
+    if text_density > config.TEXT_DENSITY_HIGH:
+        if entropy > config.ENTROPY_HIGH:
+            lines.append(
+                f"文字密度({text_density:.2f})与视觉熵({entropy:.2f})同时偏高，"
+                "信息传递维度出现拥挤，用户视觉注视点可能发生无序跳跃，"
+                "存在'决策瘫痪'(Decision Paralysis)风险。"
+            )
+            lines.append(
+                f"边缘密度当前为 {edge_density:.2f}，建议同步检查背景纹理是否在继续抬高信息噪音。"
+            )
+            lines.append("建议：削减非核心文案和装饰信息，确保用户能更早识别核心卖点。")
+        else:
+            lines.append(
+                f"文字密度({text_density:.2f})超过阈值({config.TEXT_DENSITY_HIGH})，"
+                "即使不额外叠加新的数值判断，密集文案本身也可能构成信息噪音，"
+                "干扰核心卖点的快速传达。"
+            )
+            lines.append(
+                f"边缘密度当前为 {edge_density:.2f}，可进一步核对背景元素是否还在分散文案主次。"
+            )
+            lines.append("建议：精简文案为核心卖点表达，并为主体和关键信息留出呼吸空间。")
     else:
-        lines.append("主体占比适中，可以继续用更明确的色彩对比强化轮廓。")
+        lines.append(
+            f"文字密度({text_density:.2f})未超过阈值({config.TEXT_DENSITY_HIGH})，"
+            "信息输入通道相对克制，不易直接形成信息过载。"
+        )
+        lines.append(
+            f"边缘密度当前为 {edge_density:.2f}，后续仍可结合实际画面检查是否存在多余装饰噪音。"
+        )
 
-    lines.append("3. 色彩唤醒分析")
-    if color_saturation > 0.6:
-        lines.append("色彩饱和度较高，适合需要强刺激和冲动点击的场景。")
-    elif color_saturation < 0.3:
-        lines.append("整体色调偏克制，适合高级感表达，但在信息流里可能不够抓眼。")
-        lines.append("如果目标是快消转化，建议在焦点区域补充更高唤醒色。")
+    lines.append("")
+    lines.append("【选择性注意理论分析】")
+    lines.append(
+        f"当前主体占比为 {subject_area_ratio:.2f}，边缘密度为 {edge_density:.2f}，颜色饱和度为 {color_saturation:.2f}。"
+    )
+    if entropy > config.ENTROPY_HIGH or text_density > config.TEXT_DENSITY_HIGH:
+        lines.append(
+            "在视觉熵或文字密度偏高的情况下，背景纹理和非核心信息更容易与主体竞争注意力，"
+            "削弱单一视觉焦点。"
+        )
+        lines.append(
+            "建议：优先减少会抢走第一视线的背景元素和文字信息，再观察主体是否足够先被看到。"
+        )
+    elif entropy < config.ENTROPY_LOW:
+        lines.append(
+            "画面整体较简洁时，用户是否会把第一眼停留在主体上，更依赖主体占比和局部显著线索的组织方式。"
+        )
+        lines.append(
+            "建议：保留简洁结构的同时，让主体、文案和辅助元素围绕同一个注意力锚点组织。"
+        )
     else:
-        lines.append("色彩饱和度处于舒适区间，整体观感比较稳定。")
+        lines.append(
+            "在 untitled7.py 当前特征体系下，选择性注意主要还是通过主体占比、边缘信息和色彩唤醒来判断焦点是否集中。"
+        )
+        lines.append("建议：检查这些线索是否共同服务于主体，而不是让用户在背景和卖点之间来回跳转。")
+
+    lines.append("")
+    lines.append("【中心偏好理论分析】")
+    lines.append(
+        f"当前主体占比为 {subject_area_ratio:.2f}。中心偏好理论关注的是用户能否在初始注视阶段"
+        "迅速锁定主体，因此这个指标更适合作为构图聚焦程度的辅助信号。"
+    )
+    lines.append(
+        "在不额外引入新数值阈值的前提下，建议回到实际构图检查主体是否稳定落在中心关注区，"
+        "以及主要信息是否围绕主体组织。"
+    )
+    lines.append("建议：尽量减少用户寻找焦点的路径成本，让主体在首轮浏览中更快被识别。")
 
     return {
         "lines": lines,
