@@ -1,5 +1,5 @@
 ﻿# -*- coding: utf-8 -*-
-"""基于规则生成主图优化建议。"""
+"""基于当前主链路真实特征生成主图优化建议。"""
 
 import config
 
@@ -12,40 +12,11 @@ def _to_float(value: object, default: float = 0.0) -> float:
         return default
 
 
-def _to_int(value: object, default: int = 0) -> int:
-    """把值转成 int，失败时返回默认值。"""
-    try:
-        return int(value)
-    except Exception:
-        return default
-
-
-def _to_optional_int(value: object) -> int | None:
-    try:
-        if value is None:
-            return None
-        return int(value)
-    except Exception:
-        return None
-
-
-def _get_optional_float(source: dict, key: str) -> float | None:
-    if key not in source:
-        return None
-    try:
-        return float(source.get(key))
-    except Exception:
-        return None
-
-
-def generate_advice(features: dict, ctr_score: float, ctr_percentile: int | None) -> list[dict]:
+def generate_advice(features: dict) -> list[dict]:
     """按优先级返回主图优化建议。"""
     entropy = _to_float(features.get("entropy", 0.0))
     text_density = _to_float(features.get("text_density", 0.0))
-    contrast = _get_optional_float(features, "contrast")
-    brightness = _get_optional_float(features, "brightness")
-    percentile = _to_optional_int(ctr_percentile)
-    score = _to_float(ctr_score, 0.0)
+    subject_area_ratio = _to_float(features.get("subject_area_ratio", 0.0))
 
     advice: list[dict] = []
 
@@ -68,25 +39,6 @@ def generate_advice(features: dict, ctr_score: float, ctr_percentile: int | None
             }
         )
 
-    if contrast is not None and contrast < config.CONTRAST_LOW:
-        advice.append(
-            {
-                "priority": "高",
-                "category": "颜色对比度",
-                "issue": f"颜色对比度为 {contrast:.4f}，低于阈值 {config.CONTRAST_LOW}",
-                "suggestion": "主体与背景分离度不足，选择性注意理论表明用户难以快速锁定显著目标，建议使用更高对比度背景或补色搭配来强化视觉显著性。",
-            }
-        )
-    elif contrast is not None and contrast > config.CONTRAST_HIGH:
-        advice.append(
-            {
-                "priority": "中",
-                "category": "颜色对比度",
-                "issue": f"颜色对比度为 {contrast:.4f}，高于阈值 {config.CONTRAST_HIGH}",
-                "suggestion": "多个高对比度区域可能分散用户的选择性注意力，建议适度柔化非主体区域色调，确保单一视觉焦点。",
-            }
-        )
-
     if text_density > config.TEXT_DENSITY_HIGH:
         advice.append(
             {
@@ -97,47 +49,16 @@ def generate_advice(features: dict, ctr_score: float, ctr_percentile: int | None
             }
         )
 
-    if brightness is not None and brightness < config.BRIGHTNESS_LOW:
-        advice.append(
-            {
-                "priority": "高",
-                "category": "图像亮度",
-                "issue": f"亮度为 {brightness:.4f}，低于阈值 {config.BRIGHTNESS_LOW}",
-                "suggestion": "整体偏暗削弱了主体的视觉显著性，不利于选择性注意的激活，建议提升曝光或补光。",
-            }
-        )
-    elif brightness is not None and brightness > config.BRIGHTNESS_HIGH:
+    if subject_area_ratio < config.SUBJECT_AREA_RATIO_LOW:
         advice.append(
             {
                 "priority": "中",
-                "category": "图像亮度",
-                "issue": f"亮度为 {brightness:.4f}，高于阈值 {config.BRIGHTNESS_HIGH}",
-                "suggestion": "画面过亮可能导致细节层次丢失，降低视觉信息的区分度，建议适当降低亮度并保留层次。",
-            }
-        )
-
-    if percentile is not None and percentile < config.CTR_PCT_LOW:
-        advice.append(
-            {
-                "priority": "高",
-                "category": "综合评分",
+                "category": "主体聚焦",
                 "issue": (
-                    f"CTR 预测分数为 {score:.4f}，当前仅优于 {percentile}% 同类商品，"
-                    f"低于阈值 {config.CTR_PCT_LOW}%"
+                    f"主体占比为 {subject_area_ratio:.4f}，低于阈值 "
+                    f"{config.SUBJECT_AREA_RATIO_LOW}"
                 ),
-                "suggestion": "综合认知诊断表现偏弱，建议参考高 CTR 样式，从认知负荷、信息密度、视觉显著性、中心构图四个维度进行结构性重设计。",
-            }
-        )
-    elif percentile is not None and config.CTR_PCT_LOW <= percentile < config.CTR_PCT_MID:
-        advice.append(
-            {
-                "priority": "中",
-                "category": "综合评分",
-                "issue": (
-                    f"CTR 预测分数为 {score:.4f}，当前优于 {percentile}% 同类商品，"
-                    f"仍低于目标阈值 {config.CTR_PCT_MID}%"
-                ),
-                "suggestion": "整体有优化空间，建议优先修复高优先级问题并持续 A/B 测试。",
+                "suggestion": "主体面积偏小会抬高用户寻找视觉焦点的认知成本，建议放大主体或压缩非核心背景区域，增强中心聚焦感。",
             }
         )
 

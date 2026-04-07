@@ -178,9 +178,8 @@ async def analyze(file: UploadFile = File(...)) -> Any:
 
         try:
             ctr_score = predict_reference_ctr(features)
-            ctr_percentile = None
         except Exception:  # noqa: BLE001
-            ctr_score, ctr_percentile = 0.5, None
+            ctr_score = 0.5
             warnings.append("ctr_fallback_mock_value")
 
         try:
@@ -201,7 +200,7 @@ async def analyze(file: UploadFile = File(...)) -> Any:
 
         advice: list[dict] = []
         try:
-            advice = generate_advice(features, float(ctr_score), ctr_percentile)
+            advice = generate_advice(features)
         except Exception:  # noqa: BLE001
             warnings.append("advice_generation_failed")
 
@@ -221,8 +220,6 @@ async def analyze(file: UploadFile = File(...)) -> Any:
             },
             "ctr": {
                 "score": _to_float(ctr_score),
-                "percentile": int(ctr_percentile) if ctr_percentile is not None else None,
-                "percentile_available": ctr_percentile is not None,
             },
             "heatmap_base64": _rgb_array_to_base64(heatmap_array),
             "similar": [

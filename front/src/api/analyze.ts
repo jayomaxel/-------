@@ -7,9 +7,6 @@ const BACKEND_READY_POLL_MS = 500;
 export interface AnalyzeFeatures {
   entropy?: number;
   text_density?: number;
-  brightness?: number;
-  contrast?: number;
-  saturation?: number;
   subject_area_ratio?: number;
   edge_density?: number;
   color_saturation?: number;
@@ -17,8 +14,6 @@ export interface AnalyzeFeatures {
 
 export interface AnalyzeCTR {
   score: number;
-  percentile: number | null;
-  percentile_available?: boolean;
 }
 
 export interface PsychologicalReport {
@@ -121,15 +116,6 @@ export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
     ...(typeof data.features?.text_density === 'number'
       ? { text_density: data.features.text_density }
       : {}),
-    ...(typeof data.features?.brightness === 'number'
-      ? { brightness: data.features.brightness }
-      : {}),
-    ...(typeof data.features?.contrast === 'number'
-      ? { contrast: data.features.contrast }
-      : {}),
-    ...(typeof data.features?.saturation === 'number'
-      ? { saturation: data.features.saturation }
-      : {}),
     ...(typeof data.features?.subject_area_ratio === 'number'
       ? { subject_area_ratio: data.features.subject_area_ratio }
       : {}),
@@ -145,8 +131,6 @@ export async function analyzeImage(file: File): Promise<AnalyzeResponse> {
     features,
     ctr: {
       score: data.ctr?.score ?? 0.5,
-      percentile: data.ctr?.percentile ?? null,
-      percentile_available: data.ctr?.percentile_available ?? false,
     },
     heatmap_base64: data.heatmap_base64 ?? '',
     similar: (data.similar ?? []).map((item) => ({

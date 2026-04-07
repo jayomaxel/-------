@@ -333,8 +333,6 @@ curl -X POST http://127.0.0.1:8000/analyze `
   - `color_saturation`
 - `ctr`
   - `score`
-  - `percentile`
-  - `percentile_available`
 - `heatmap_base64`
 - `similar[]`
   - `rank`
@@ -414,11 +412,11 @@ curl -X POST http://127.0.0.1:8000/analyze `
 ## 当前限制
 
 - `/analyze` 当前只返回 5 个同源视觉特征，不返回 `brightness`、`contrast`、`saturation`
+- 规则建议当前只基于主链路真实可得的特征生成，不再依赖未返回的扩展字段或休眠的 percentile 建议分支
 - CTR 模型是 6 个品类混合训练后的全局模型，不区分单独类目
 - 相似图检索默认跨 6 个数据集联合检索，不做单类目过滤
 - `TOP_K_SIMILAR = 5`
 - 热力图实现是显著性 + 边缘融合，不是 Grad-CAM
-- `ctr.percentile` 当前通常为 `null`，`ctr.percentile_available` 通常为 `false`
 - 如果系统未安装 Tesseract OCR，`text_density` 可能始终偏低或为 `0.0`
 
 ## 排障
@@ -463,5 +461,5 @@ curl -X POST http://127.0.0.1:8000/analyze `
 ## 维护建议
 
 - 更新数据集后，同步更新 `config.py` 和本 README 中的数据表
-- 更换 CTR 模型或 scaler 后，同步检查 `model_scope`、模型路径和 percentile 说明
+- 更换 CTR 模型或 scaler 后，同步检查 `model_scope`、模型路径和响应字段说明
 - 如果未来把 CDN 依赖改成本地 npm 依赖，也应同步更新 README 的网络要求
