@@ -334,7 +334,7 @@ def generate_psychological_report(reference_features: dict[str, object], predict
         )
     else:
         lines.append(
-            "在 untitled7.py 当前特征体系下，选择性注意主要还是通过主体占比、边缘信息和色彩唤醒来判断焦点是否集中。"
+            "在当前特征体系下，选择性注意主要还是通过主体占比、边缘信息和色彩唤醒来判断焦点是否集中。"
         )
         lines.append("建议：检查这些线索是否共同服务于主体，而不是让用户在背景和卖点之间来回跳转。")
 

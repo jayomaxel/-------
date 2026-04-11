@@ -22,7 +22,7 @@ def _resolve_path(path_value: str) -> Path:
 
 
 def _extract_clip_vector_only(image_path: Path) -> np.ndarray:
-    """只提取 CLIP 向量，算法与 untitled7.py 同源。"""
+    """只提取 CLIP 向量，算法与当前主链路保持同源。"""
     vector = get_clip_feature(image_path)
     if not isinstance(vector, np.ndarray) or vector.shape != (512,):
         raise ValueError(f"Invalid CLIP vector shape: {getattr(vector, 'shape', None)}")
