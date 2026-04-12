@@ -1,14 +1,4123 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>电商主图智能认知诊断系统</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <title>ImageIQ | 电商主图智能诊断</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #faf8f3;
+        --text: #1a1a1a;
+        --muted: #888888;
+        --soft: #e0ddd5;
+        --line: #1a1a1a;
+        --panel: #1a1a1a;
+        --panel-text: #faf8f3;
+        --danger: #a33838;
+        --online: #2f8f2f;
+        --offline: #b24444;
+        --font-title: Georgia, "STSong", serif;
+        --font-body: -apple-system, "PingFang SC", sans-serif;
+        --radius: 8px;
+        --ease-out: cubic-bezier(0.77, 0, 0.175, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      body {
+        overflow: hidden;
+        font-family: var(--font-body);
+      }
+
+      img,
+      svg {
+        display: block;
+        max-width: 100%;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      #app {
+        height: 100vh;
+        overflow-y: scroll;
+        scroll-snap-type: y mandatory;
+        scroll-behavior: smooth;
+        overscroll-behavior-y: contain;
+        background: var(--bg);
+      }
+
+      .screen {
+        position: relative;
+        height: 100vh;
+        min-height: 100vh;
+        padding: clamp(18px, 2.8vw, 32px) clamp(20px, 4vw, 52px);
+        scroll-snap-align: start;
+        overflow: hidden;
+      }
+
+      .screen:not(.landing-screen)::before {
+        content: "";
+        position: absolute;
+        top: 53%;
+        right: -16vw;
+        width: min(56vw, 900px);
+        height: min(56vw, 900px);
+        transform: translateY(-50%) rotate(-45deg);
+        transform-origin: center;
+        opacity: 0.28;
+        pointer-events: none;
+        z-index: 0;
+        background:
+          center / contain no-repeat
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 320' fill='none'%3E%3Cpolygon points='160 28 286 118 238 272 82 272 34 118' stroke='%23d8d2c7' stroke-width='2.8'/%3E%3Cpolygon points='160 62 252 126 218 238 102 238 68 126' stroke='%23d8d2c7' stroke-width='2.4'/%3E%3Cpolygon points='160 96 218 134 198 204 122 204 102 134' stroke='%23d8d2c7' stroke-width='2'/%3E%3Cpath d='M160 160V28' stroke='%23d8d2c7' stroke-width='2.2'/%3E%3Cpath d='M160 160L286 118' stroke='%23d8d2c7' stroke-width='2.2'/%3E%3Cpath d='M160 160L238 272' stroke='%23d8d2c7' stroke-width='2.2'/%3E%3Cpath d='M160 160L82 272' stroke='%23d8d2c7' stroke-width='2.2'/%3E%3Cpath d='M160 160L34 118' stroke='%23d8d2c7' stroke-width='2.2'/%3E%3C/svg%3E");
+      }
+
+      .screen-inner {
+        width: min(100%, 1440px);
+        height: 100%;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .section-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .section-meta-icon {
+        width: 14px;
+        height: 14px;
+        color: #a9a193;
+        opacity: 0.95;
+        flex-shrink: 0;
+      }
+
+      .section-meta-icon svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .section-rule {
+        height: 2px;
+        background: var(--line);
+        margin: 16px 0 24px;
+        flex-shrink: 0;
+      }
+
+      .empty-state {
+        width: 100%;
+        min-height: 140px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        font-size: 14px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .landing-screen {
+        padding: 0;
+        --scroll-progress: 0;
+      }
+
+      .landing-stage {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .landing-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .landing-label {
+        margin-bottom: -4px;
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        color: var(--muted);
+      }
+
+      .landing-wordmark {
+        margin-top: -4px;
+        font-family: var(--font-title);
+        font-size: 13px;
+        letter-spacing: 0.2em;
+        color: var(--text);
+      }
+
+      .scroll-cue {
+        position: absolute;
+        right: 28px;
+        bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        color: #aaaaaa;
+        letter-spacing: 0.08em;
+        animation: cueFloat 1.5s ease-in-out infinite;
+        z-index: 4;
+        opacity: clamp(0, calc(1 - var(--scroll-progress) * 1.35), 1);
+      }
+
+      .scroll-cue-arrow {
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .hero-title {
+        font-family: var(--font-title);
+        font-size: clamp(40px, 5vw, 48px);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 0.95;
+        margin: 0;
+      }
+
+      .hero-grid {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+
+      .hero-column {
+        padding: 28px 22px 22px 0;
+        min-width: 0;
+      }
+
+      .hero-column + .hero-column {
+        border-left: 1px solid var(--line);
+        padding-left: 22px;
+      }
+
+      .hero-copy {
+        max-width: 30ch;
+        margin: 0 0 28px;
+        font-size: 16px;
+        line-height: 1.8;
+        color: #555555;
+      }
+
+      .hero-minimal {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-top: 8px;
+      }
+
+      .hero-heading {
+        max-width: 540px;
+      }
+
+      .hero-copy-compact {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.8;
+        color: #555555;
+      }
+
+      .backend-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--text);
+      }
+
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--offline);
+        flex-shrink: 0;
+      }
+
+      .status-dot.online {
+        background: var(--online);
+      }
+
+      .backend-status-corner {
+        align-self: flex-end;
+      }
+
+      .capability-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .capability-card {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--panel-text);
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      .hero-stat-list {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .hero-stat-row {
+        padding: 6px 0 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .hero-stat-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .hero-stat-number {
+        font-family: var(--font-title);
+        font-size: clamp(52px, 5vw, 64px);
+        font-weight: 900;
+        line-height: 0.9;
+      }
+
+      .hero-stat-text {
+        margin-top: 8px;
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+      }
+
+      .upload-layout {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+      }
+
+      .dropzone {
+        width: min(70vw, 1080px);
+        max-width: 100%;
+        height: min(55vh, 560px);
+        border: 2px dashed var(--line);
+        border-radius: var(--radius);
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 200ms ease, opacity 200ms ease;
+      }
+
+      .dropzone-layout {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 36px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+      }
+
+      .dropzone.dragging {
+        transform: translateY(-2px);
+      }
+
+      .dropzone.has-image {
+        border-style: solid;
+      }
+
+      .dropzone-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        height: 100%;
+      }
+
+      .dropzone-placeholder-box {
+        width: 78%;
+        height: 78%;
+        border-radius: 6px;
+        background: #f6f3eb;
+        border: 1px solid #e3dfd6;
+        flex-shrink: 0;
+      }
+
+      .dropzone-preview-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        height: 100%;
+      }
+
+      .dropzone-preview-title {
+        font-size: 14px;
+        color: var(--text);
+      }
+
+      .dropzone-preview-frame {
+        width: min(100%, 520px);
+        height: min(34vh, 360px);
+        border-radius: 6px;
+        background: #f0ede5;
+        border: 1px solid #e3dfd6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .dropzone-preview-frame.has-image {
+        border-color: var(--line);
+        background: var(--bg);
+      }
+
+      .upload-icon {
+        width: 62px;
+        height: 62px;
+      }
+
+      .dropzone-text {
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .dropzone-preview {
+        width: 100%;
+        height: 100%;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: contain;
+      }
+
+      .dropzone-preview[hidden] {
+        display: none !important;
+      }
+
+      .primary-button {
+        min-width: 180px;
+        padding: 14px 28px;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--text);
+        cursor: pointer;
+        transition: background 200ms ease, color 200ms ease, opacity 200ms ease;
+      }
+
+      .primary-button:hover:not(:disabled) {
+        background: var(--text);
+        color: var(--bg);
+      }
+
+      .primary-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .upload-error {
+        min-height: 20px;
+        font-size: 13px;
+        color: var(--danger);
+      }
+
+      .split-grid {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 45% 55%;
+      }
+
+      .split-column {
+        position: relative;
+        min-width: 0;
+        padding: 0 20px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 0;
+      }
+
+      .split-column.right {
+        border-left: 1px solid var(--line);
+        padding-left: 20px;
+        padding-right: 0;
+      }
+
+      .panel-label {
+        width: 60%;
+        max-width: 420px;
+        margin-bottom: 12px;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      .panel-figure {
+        width: 60%;
+        max-width: 420px;
+        height: min(39vh, calc((100vh - 230px) * 0.6));
+        border-radius: 4px;
+        background: #f0ede5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        min-height: 0;
+        margin: auto;
+      }
+
+      .panel-figure.has-image {
+        border: 1px solid var(--line);
+        background: var(--bg);
+      }
+
+      .panel-figure img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: var(--bg);
+      }
+
+      .figure-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .figure-placeholder svg {
+        display: block;
+        width: min(72%, 140px);
+        height: auto;
+      }
+
+      .figure-placeholder.heatmap svg {
+        width: min(76%, 150px);
+      }
+
+      .panel-figure-left,
+      .panel-figure-right {
+        opacity: 0;
+        transition: transform 500ms ease, opacity 500ms ease;
+        will-change: transform, opacity;
+      }
+
+      .panel-figure-left {
+        transform: translateX(-40px);
+      }
+
+      .panel-figure-right {
+        transform: translateX(40px);
+        transition-delay: 100ms;
+      }
+
+      .screen.is-visible .panel-figure-left,
+      .screen.is-visible .panel-figure-right {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .ctr-overlay {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        padding: 14px 0 0 20px;
+        border-top: 1px solid var(--line);
+        border-left: 1px solid var(--line);
+        background: var(--bg);
+        text-align: right;
+      }
+
+      .ctr-overlay.is-hidden {
+        visibility: hidden;
+      }
+
+      .ctr-score {
+        font-family: var(--font-title);
+        font-size: clamp(58px, 7vw, 72px);
+        font-weight: 900;
+        line-height: 0.9;
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .ctr-copy {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .features-shell {
+        flex: 1;
+        min-height: 0;
+      }
+
+      .features-layout {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
+        position: relative;
+      }
+
+      .features-layout.is-empty .feature-radar-panel,
+      .features-layout.is-empty .feature-row {
+        opacity: 1;
+        transform: none;
+      }
+
+      .features-decor {
+        position: absolute;
+        right: -60px;
+        bottom: -60px;
+        width: 320px;
+        height: 320px;
+        color: var(--text);
+        opacity: 0.06;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .features-decor svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .feature-radar-panel {
+        padding: 12px 24px 12px 0;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        opacity: 0;
+        transform: translateY(24px);
+        transition: transform 500ms ease, opacity 500ms ease;
+        position: relative;
+        z-index: 1;
+      }
+
+      .screen.is-visible .feature-radar-panel {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .feature-radar-panel.is-empty {
+        justify-content: center;
+      }
+
+      .feature-radar-meta {
+        width: min(100%, 360px);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      .feature-radar-frame {
+        width: min(100%, 360px);
+        aspect-ratio: 1 / 1;
+        border-radius: 6px;
+        border: 1px solid #e3dfd6;
+        background: #f6f3eb;
+        padding: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .feature-radar-frame.is-empty {
+        background: transparent;
+        border-color: #ddd8ce;
+      }
+
+      .feature-radar-grid {
+        width: 100%;
+        height: 100%;
+        color: #cfc8bb;
+        opacity: 0.78;
+      }
+
+      .feature-radar-canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      .feature-list {
+        min-height: 0;
+        display: grid;
+        grid-template-rows: repeat(5, 1fr);
+        position: relative;
+        z-index: 1;
+      }
+
+      .feature-row {
+        padding: 18px 0 18px 22px;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 18px;
+        opacity: 0;
+        transform: translateY(30px);
+        transition: transform 500ms ease, opacity 500ms ease;
+        transition-delay: var(--delay, 0ms);
+      }
+
+      .feature-row:last-child {
+        border-bottom: 0;
+      }
+
+      .screen.is-visible .feature-row {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .feature-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .feature-name-cn {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: #5b5448;
+      }
+
+      .feature-name-en {
+        font-size: 12px;
+        color: #9d9588;
+      }
+
+      .feature-value-wrap {
+        min-width: 160px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 12px;
+      }
+
+      .feature-value {
+        font-family: var(--font-title);
+        font-size: clamp(44px, 4vw, 56px);
+        font-weight: 900;
+        line-height: 0.9;
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .feature-value.is-empty {
+        color: var(--soft);
+      }
+
+      .features-layout.is-empty .feature-name-cn {
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: #3f3930;
+      }
+
+      .features-layout.is-empty .feature-name-en {
+        font-size: 19px;
+        font-weight: 500;
+        color: #5d5548;
+      }
+
+      .features-layout.is-empty .feature-value.is-empty {
+        font-size: clamp(112px, 9.2vw, 138px);
+        color: #766d60;
+      }
+
+      .feature-bar {
+        width: min(180px, 100%);
+        height: 2px;
+        background: var(--soft);
+        overflow: hidden;
+      }
+
+      .feature-fill {
+        height: 100%;
+        background: var(--text);
+      }
+
+      .feature-fill.is-empty {
+        width: 0 !important;
+        background: transparent;
+      }
+
+      .similar-shell {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .similar-strip {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        justify-content: center;
+        gap: 16px;
+        padding: 6px 0;
+        scrollbar-width: none;
+        cursor: grab;
+        touch-action: pan-x;
+      }
+
+      .similar-strip::-webkit-scrollbar {
+        display: none;
+      }
+
+      .similar-strip.dragging {
+        cursor: grabbing;
+        user-select: none;
+      }
+
+      .similar-strip.is-placeholder {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 15px;
+        cursor: default;
+        touch-action: auto;
+        overflow: hidden;
+      }
+
+      .similar-card {
+        width: clamp(220px, 15.8vw, 248px);
+        min-width: 220px;
+        height: min(58vh, calc(100vh - 330px));
+        flex-shrink: 0;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 20px 18px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .similar-card.is-skeleton {
+        width: auto;
+        height: min(65vh, calc(100vh - 220px));
+        border: 1px solid #d4d0c8;
+        border-right: 1px solid #d4d0c8;
+        border-radius: 4px;
+        padding: 0;
+        gap: 0;
+        overflow: hidden;
+      }
+
+      .similar-skeleton-visual {
+        width: 100%;
+        height: 70%;
+        background: #ede9e0;
+        flex-shrink: 0;
+      }
+
+      .similar-skeleton-meta {
+        width: 100%;
+        height: 30%;
+        padding: 22px 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .similar-skeleton-line {
+        height: 1px;
+        background: #d4d0c8;
+      }
+
+      .similar-skeleton-line.short {
+        width: 40%;
+      }
+
+      .similar-skeleton-line.long {
+        width: 60%;
+      }
+
+      .similar-image-placeholder {
+        width: 100%;
+        height: 100%;
+        background: #ede9e0;
+      }
+
+      .similar-index {
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .similar-image {
+        width: 100%;
+        height: 180px;
+        background: #f0ede5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .similar-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .similar-empty {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .similar-value {
+        font-family: var(--font-title);
+        font-size: 56px;
+        font-weight: 900;
+        line-height: 0.9;
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .similar-copy {
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .similar-kicker {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .similar-name {
+        min-height: 72px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #3b372f;
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+      }
+
+      .similar-detail {
+        min-height: 18px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: #7f776a;
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+      }
+
+      .similar-detail:empty {
+        display: none;
+      }
+
+      .similar-metrics {
+        margin-top: 2px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        width: 100%;
+      }
+
+      .similar-metric {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .similar-metric-label {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .similar-metric-icon {
+        width: 12px;
+        height: 12px;
+        color: #b2ab9f;
+        flex-shrink: 0;
+      }
+
+      .similar-metric-icon svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .similar-metric-value {
+        font-family: var(--font-title);
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--text);
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .similar-price {
+        font-size: 14px;
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .advice-layout {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 35% 65%;
+      }
+
+      .advice-side {
+        padding: 8px 24px 0 0;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 0;
+      }
+
+      .advice-display {
+        font-family: var(--font-title);
+        font-size: clamp(76px, 9vw, 96px);
+        font-weight: 900;
+        line-height: 0.9;
+        color: var(--soft);
+      }
+
+      .advice-count {
+        font-size: 14px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .advice-side-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .advice-side-meta.is-empty {
+        gap: 14px;
+      }
+
+      .advice-status {
+        max-width: 26ch;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .advice-side-icon {
+        width: 40px;
+        height: 50px;
+        color: #cccccc;
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .advice-side-icon[hidden] {
+        display: none !important;
+      }
+
+      .advice-main {
+        padding-left: 24px;
+        min-height: 0;
+      }
+
+      .advice-list {
+        height: 100%;
+        overflow-y: auto;
+        padding-right: 10px;
+        scrollbar-gutter: stable;
+      }
+
+      .advice-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .advice-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .advice-toolbar.is-tone-only {
+        justify-content: flex-end;
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      .advice-toolbar-copy {
+        max-width: 24ch;
+        font-size: 11px;
+        line-height: 1.65;
+        color: var(--muted);
+      }
+
+      .advice-toolbar-copy:empty {
+        display: none;
+      }
+
+      .tone-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tone-chip {
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        transition: background 200ms ease, color 200ms ease;
+      }
+
+      .tone-chip:hover {
+        background: #f0ede5;
+      }
+
+      .tone-chip.is-active {
+        background: var(--text);
+        color: var(--bg);
+      }
+
+      .advice-section {
+        padding-top: 4px;
+      }
+
+      .advice-section + .advice-section {
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .advice-section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .advice-section-title {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+      }
+
+      .advice-section-note {
+        font-size: 11px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .analysis-shell {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .analysis-card {
+        min-width: 0;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #f6f3eb;
+      }
+
+      .analysis-card.summary {
+        grid-column: 1 / -1;
+      }
+
+      .analysis-card-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .analysis-card-title {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+      }
+
+      .analysis-card-note {
+        font-size: 10px;
+        color: #9a9388;
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .analysis-summary {
+        font-size: 14px;
+        line-height: 1.85;
+        color: var(--text);
+      }
+
+      .analysis-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .analysis-item {
+        display: grid;
+        grid-template-columns: 14px minmax(0, 1fr);
+        gap: 10px;
+        font-size: 13px;
+        line-height: 1.8;
+        color: #555555;
+      }
+
+      .analysis-item-mark {
+        color: var(--text);
+      }
+
+      .advice-groups {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .advice-group-block {
+        padding: 16px;
+        border: 1px solid #e2ddd3;
+        border-radius: 6px;
+        background: #f8f5ee;
+      }
+
+      .advice-group-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .advice-group-title {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+      }
+
+      .advice-group-note {
+        font-size: 10px;
+        color: #9a9388;
+        font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+      }
+
+      .advice-inline-empty {
+        padding: 8px 0 2px;
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .advice-group-block .advice-row:first-of-type {
+        padding-top: 2px;
+      }
+
+      .advice-group-block .advice-row:last-child {
+        padding-bottom: 2px;
+        border-bottom: 0;
+      }
+
+      .advice-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 18px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+      }
+
+      .badge.high {
+        background: var(--text);
+        color: var(--bg);
+      }
+
+      .badge.medium {
+        background: transparent;
+        color: var(--text);
+      }
+
+      .badge.low {
+        border-color: #dddddd;
+        color: #aaaaaa;
+      }
+
+      .advice-category {
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+      }
+
+      .advice-issue {
+        margin-top: 3px;
+        font-size: 14px;
+        color: var(--text);
+        line-height: 1.7;
+      }
+
+      .advice-suggestion {
+        margin-top: 4px;
+        font-size: 13px;
+        color: #555555;
+        line-height: 1.7;
+      }
+
+      .advice-skeleton {
+        padding-top: 6px;
+      }
+
+      .advice-skeleton-line {
+        height: 1px;
+        background: var(--soft);
+        margin-bottom: 32px;
+      }
+
+      .advice-skeleton-line:last-child {
+        margin-bottom: 0;
+      }
+
+      .config-tone-group {
+        margin-top: 18px;
+      }
+
+      .config-tone-grid {
+        margin-top: 10px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .config-tone-button {
+        padding: 12px 12px 13px;
+        border: 1px solid #d9d3c7;
+        border-radius: 6px;
+        background: #f6f3eb;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+        transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+      }
+
+      .config-tone-button:hover {
+        border-color: var(--line);
+        background: var(--bg);
+      }
+
+      .config-tone-button.is-active {
+        border-color: var(--line);
+        background: var(--text);
+        color: var(--bg);
+      }
+
+      .config-tone-label {
+        font-size: 13px;
+      }
+
+      .config-tone-desc {
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: inherit;
+        opacity: 0.76;
+      }
+
+      .footer-line {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 11px;
+        color: #aaaaaa;
+        flex-shrink: 0;
+      }
+
+      .page-nav-shell {
+        position: fixed;
+        top: 18px;
+        left: 20px;
+        right: 92px;
+        z-index: 35;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .page-nav {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 4px 10px;
+        border-bottom: 1px solid #d9d3c7;
+        background: rgba(250, 248, 243, 0.94);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-10px);
+        transition: transform 220ms ease, opacity 220ms ease;
+      }
+
+      .page-nav.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+
+      .page-nav-link {
+        position: relative;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: #8f8778;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: color 180ms ease, opacity 180ms ease;
+      }
+
+      .page-nav-link:hover,
+      .page-nav-link:focus-visible,
+      .page-nav-link.is-active {
+        color: var(--text);
+      }
+
+      .page-nav-link:focus-visible {
+        outline: none;
+      }
+
+      .page-nav-underline {
+        position: absolute;
+        left: 0;
+        bottom: -1px;
+        width: 1px;
+        height: 2px;
+        background: var(--line);
+        opacity: 0;
+        transform: translate3d(0, 0, 0) scaleX(0.001);
+        transform-origin: left center;
+        will-change: transform, opacity;
+      }
+
+      .floating-tools {
+        position: fixed;
+        top: 18px;
+        right: 20px;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+      }
+
+      .config-trigger {
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: rgba(250, 248, 243, 0.96);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background 200ms ease, color 200ms ease, transform 200ms ease;
+      }
+
+      .config-trigger:hover {
+        background: var(--text);
+        color: var(--bg);
+        transform: translateY(-1px);
+      }
+
+      .config-trigger svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+
+      .config-trigger-text {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+      }
+
+      .config-state-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--offline);
+        flex-shrink: 0;
+      }
+
+      .config-trigger.is-configured .config-state-dot {
+        background: var(--online);
+      }
+
+      .config-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(26, 26, 26, 0.18);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 220ms ease;
+      }
+
+      .config-overlay[hidden] {
+        display: none !important;
+      }
+
+      .config-overlay.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .config-dialog {
+        width: min(100%, 520px);
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        padding: 22px;
+        opacity: 0;
+        transform: translateY(12px);
+        transition: transform 220ms ease, opacity 220ms ease;
+      }
+
+      .config-overlay.is-open .config-dialog {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .config-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .config-kicker {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+      }
+
+      .config-title {
+        margin: 6px 0 0;
+        font-family: var(--font-title);
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .config-close {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .config-copy {
+        margin: 16px 0 0;
+        font-size: 13px;
+        line-height: 1.8;
+        color: #555555;
+      }
+
+      .config-field {
+        margin-top: 18px;
+      }
+
+      .config-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .config-input {
+        width: 100%;
+        height: 46px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #f6f3eb;
+        color: var(--text);
+        outline: none;
+      }
+
+      .config-input:focus {
+        background: var(--bg);
+      }
+
+      .config-help {
+        margin-top: 10px;
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .config-error {
+        min-height: 20px;
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--danger);
+      }
+
+      .config-actions {
+        margin-top: 18px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .secondary-button {
+        min-width: 112px;
+        padding: 12px 18px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+        transition: background 200ms ease, color 200ms ease;
+      }
+
+      .secondary-button:hover {
+        background: var(--text);
+        color: var(--bg);
+      }
+
+      @keyframes cueFloat {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(4px);
+        }
+      }
+
+      @media (max-width: 1080px) {
+        .hero-grid,
+        .split-grid,
+        .advice-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-column,
+        .hero-column + .hero-column {
+          padding: 18px 0;
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+
+        .split-column {
+          padding: 0 0 18px;
+        }
+
+        .split-column.right {
+          padding: 18px 0 0;
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+
+        .panel-label,
+        .panel-figure {
+          width: 72%;
+        }
+
+        .ctr-overlay {
+          position: static;
+          align-self: flex-end;
+          margin-top: 12px;
+        }
+
+        .features-layout {
+          width: 100%;
+          grid-template-columns: 1fr;
+        }
+
+        .feature-radar-panel {
+          padding: 0 0 18px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .feature-list {
+          grid-template-rows: none;
+        }
+
+        .feature-row {
+          padding-left: 0;
+        }
+
+        .advice-side {
+          padding: 0 0 18px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .advice-main {
+          padding: 18px 0 0;
+        }
+
+        .analysis-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .analysis-card.summary {
+          grid-column: auto;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .screen {
+          padding: 18px 16px;
+        }
+
+        .screen:not(.landing-screen)::before {
+          right: -32vw;
+          width: min(96vw, 560px);
+          height: min(96vw, 560px);
+          opacity: 0.24;
+        }
+
+        .page-nav-shell {
+          top: 12px;
+          left: 12px;
+          right: 78px;
+        }
+
+        .page-nav {
+          gap: 12px;
+          padding-bottom: 8px;
+        }
+
+        .page-nav-link {
+          font-size: 10px;
+          letter-spacing: 0.08em;
+        }
+
+        .floating-tools {
+          top: 12px;
+          right: 12px;
+        }
+
+        .features-decor {
+          width: min(240px, 54vw);
+          height: min(240px, 54vw);
+          right: -78px;
+          bottom: -78px;
+        }
+
+        .panel-figure,
+        .similar-card {
+          height: min(42vh, 340px);
+        }
+
+        .panel-label,
+        .panel-figure {
+          width: 84%;
+        }
+
+        .dropzone {
+          width: 100%;
+          height: min(46vh, 420px);
+        }
+
+        .dropzone-layout {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+
+        .dropzone-preview-panel {
+          gap: 12px;
+        }
+
+        .similar-card {
+          width: min(78vw, 280px);
+          padding: 18px;
+        }
+
+        .feature-row {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .feature-value-wrap {
+          min-width: 0;
+          align-items: flex-start;
+        }
+
+        .feature-bar {
+          width: 100%;
+        }
+
+        .advice-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .similar-metrics {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .config-tone-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .footer-line {
+          flex-direction: column;
+        }
+
+        .config-dialog {
+          padding: 18px;
+        }
+
+        .config-actions {
+          flex-direction: column-reverse;
+        }
+
+        .config-actions .secondary-button,
+        .config-actions .primary-button {
+          width: 100%;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div class="page-nav-shell">
+      <nav class="page-nav" id="pageNav" aria-label="页面导航" aria-hidden="true">
+        <a class="page-nav-link" href="#s2" data-nav-target="s2">上传图片</a>
+        <a class="page-nav-link" href="#s3" data-nav-target="s3">热力图</a>
+        <a class="page-nav-link" href="#s4" data-nav-target="s4">图像特征</a>
+        <a class="page-nav-link" href="#s5" data-nav-target="s5">相似竞品</a>
+        <a class="page-nav-link" href="#s6" data-nav-target="s6">优化建议</a>
+        <span class="page-nav-underline" id="pageNavUnderline" aria-hidden="true"></span>
+      </nav>
+    </div>
+
+    <div class="floating-tools">
+      <button class="config-trigger" id="configTrigger" type="button" aria-haspopup="dialog" aria-controls="configOverlay">
+        <span class="config-state-dot" id="configStateDot" aria-hidden="true"></span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3.5L13.55 5.25L15.9 4.85L16.5 7.15L18.85 7.75L18.45 10.1L20.2 11.65L18.45 13.2L18.85 15.55L16.5 16.15L15.9 18.45L13.55 18.05L12 19.8L10.45 18.05L8.1 18.45L7.5 16.15L5.15 15.55L5.55 13.2L3.8 11.65L5.55 10.1L5.15 7.75L7.5 7.15L8.1 4.85L10.45 5.25L12 3.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+          <circle cx="12" cy="11.65" r="2.65" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+        <span class="config-trigger-text">AI</span>
+      </button>
+    </div>
+
+    <div class="config-overlay" id="configOverlay" hidden>
+      <div class="config-dialog" role="dialog" aria-modal="true" aria-labelledby="configTitle">
+        <div class="config-head">
+          <div>
+            <div class="config-kicker">AI API</div>
+            <h2 class="config-title" id="configTitle">配置模型密钥</h2>
+          </div>
+          <button class="config-close" id="configCloseButton" type="button" aria-label="关闭">×</button>
+        </div>
+        <p class="config-copy">
+          这里可以先选择本次 AI 语言风格，并填写 API Key。确认后会开始图片分析，等
+          <code>/analyze</code> 返回后自动继续跑 <code>/ai-analysis</code>。
+        </p>
+        <div class="config-field">
+          <label class="config-label" for="configApiKeyInput">API Key</label>
+          <input
+            class="config-input"
+            id="configApiKeyInput"
+            type="password"
+            placeholder="请输入你的 AI API Key"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="config-help" id="configHelp">当前状态：未配置。仅保存在当前浏览器。</div>
+          <div class="config-error" id="configError"></div>
+        </div>
+        <div class="config-tone-group">
+          <div class="config-label">AI 语言风格</div>
+          <div class="config-tone-grid">
+            <button class="config-tone-button" type="button" data-config-tone="professional">
+              <div class="config-tone-label">专业分析</div>
+              <div class="config-tone-desc">更适合汇报和正式诊断</div>
+            </button>
+            <button class="config-tone-button" type="button" data-config-tone="gentle">
+              <div class="config-tone-label">温和建议</div>
+              <div class="config-tone-desc">先肯定亮点，再温和指出问题</div>
+            </button>
+            <button class="config-tone-button" type="button" data-config-tone="direct">
+              <div class="config-tone-label">直接犀利</div>
+              <div class="config-tone-desc">快速定位问题，不绕弯</div>
+            </button>
+            <button class="config-tone-button" type="button" data-config-tone="marketing">
+              <div class="config-tone-label">增长导向</div>
+              <div class="config-tone-desc">更聚焦点击率和转化率</div>
+            </button>
+          </div>
+        </div>
+        <div class="config-actions">
+          <button class="secondary-button" id="configSkipButton" type="button">暂不配置</button>
+          <button class="secondary-button" id="configClearButton" type="button">清除</button>
+          <button class="primary-button" id="configSaveButton" type="button">保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="app">
+      <section class="screen landing-screen" id="s0">
+        <div class="landing-stage">
+          <div class="landing-content">
+            <div class="landing-label">电商主图智能诊断</div>
+            <div id="eye-wrap" style="position:relative; width:188px; height:100px; margin:0 auto;">
+              <svg
+                id="eye-svg"
+                width="188"
+                height="100"
+                viewBox="0 0 188 100"
+                style="position:absolute;top:0;left:0;"
+              >
+                <defs>
+                  <clipPath id="eye-clip">
+                    <path d="M 22 50 Q 94 12 166 50 Q 94 88 22 50 Z"></path>
+                  </clipPath>
+                </defs>
+
+                <g clip-path="url(#eye-clip)">
+                  <rect x="0" y="0" width="188" height="100" fill="#faf8f3"></rect>
+                  <circle cx="94" cy="50" r="20" fill="#1a1a1a"></circle>
+                  <circle cx="102" cy="43" r="4" fill="#faf8f3"></circle>
+                  <path id="eyelid-top" fill="#faf8f3"></path>
+                  <path id="eyelid-bottom" fill="#faf8f3"></path>
+                </g>
+
+                <path id="eyelid-top-line" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"></path>
+                <path id="eyelid-bottom-line" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"></path>
+
+                <line data-eye-lash="0" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+                <line data-eye-lash="1" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+                <line data-eye-lash="2" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+                <line data-eye-lash="3" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+                <line data-eye-lash="4" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+                <line data-eye-lash="5" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+                <line data-eye-lash="6" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"></line>
+              </svg>
+            </div>
+            <div class="landing-wordmark">ImageIQ</div>
+          </div>
+        </div>
+        <div class="scroll-cue">
+          <span>向下滑动</span>
+          <span class="scroll-cue-arrow">↓</span>
+        </div>
+      </section>
+
+      <section class="screen" id="s2">
+        <div class="screen-inner">
+          <div class="section-meta">
+            <span class="section-meta-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 11.5V13H13V11.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                <path d="M8 3V10" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                <path d="M5.5 5.5L8 3L10.5 5.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span>01 / 上传图片</span>
+          </div>
+          <div class="section-rule"></div>
+          <div class="upload-layout">
+            <input id="fileInput" type="file" accept="image/*" hidden />
+            <div class="dropzone" id="dropzone">
+              <div class="dropzone-layout">
+                <div class="dropzone-copy" id="dropzoneCopy">
+                  <svg class="upload-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M32 44V14" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" />
+                    <path d="M21 25L32 14L43 25" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M16 50H48" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                  <div class="dropzone-text">拖拽商品主图至此，或点击选择文件</div>
+                </div>
+                <div class="dropzone-preview-panel">
+                  <div class="dropzone-preview-title">上传预览</div>
+                  <div class="dropzone-preview-frame" id="dropzonePreviewFrame">
+                    <div class="dropzone-placeholder-box" id="dropzonePlaceholderBox" aria-hidden="true"></div>
+                    <div class="dropzone-preview" id="dropzonePreview" hidden aria-hidden="true"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="primary-button" id="analyzeButton" type="button" disabled>开始分析 →</button>
+            <div class="upload-error" id="uploadError"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s3">
+        <div class="screen-inner">
+          <div class="section-meta">
+            <span class="section-meta-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="8" cy="8" rx="6" ry="3.5" stroke="currentColor" stroke-width="1" />
+                <ellipse cx="8" cy="8" rx="4" ry="2.3" stroke="currentColor" stroke-width="1" />
+                <ellipse cx="8" cy="8" rx="1.7" ry="1" stroke="currentColor" stroke-width="1" />
+              </svg>
+            </span>
+            <span>02 / 注意力热力图</span>
+          </div>
+          <div class="section-rule"></div>
+          <div class="split-grid">
+            <div class="split-column">
+              <div class="panel-label">原图</div>
+              <div class="panel-figure panel-figure-left" id="originalFigure"></div>
+            </div>
+            <div class="split-column right">
+              <div class="panel-label">注意力热力图</div>
+              <div class="panel-figure panel-figure-right" id="heatmapFigure"></div>
+              <div class="ctr-overlay is-hidden" id="ctrOverlay">
+                <div class="ctr-score" id="ctrScoreValue">--</div>
+                <div class="ctr-copy" id="ctrScoreCopy">CTR 评分 · 等待分析结果</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s4">
+        <div class="screen-inner">
+          <div class="section-meta">
+            <span class="section-meta-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="8,2 13,5.6 11,12 5,12 3,5.6" stroke="currentColor" stroke-width="1" />
+                <path d="M8 8L8 2" stroke="currentColor" stroke-width="1" />
+                <path d="M8 8L13 5.6" stroke="currentColor" stroke-width="1" />
+                <path d="M8 8L11 12" stroke="currentColor" stroke-width="1" />
+                <path d="M8 8L5 12" stroke="currentColor" stroke-width="1" />
+                <path d="M8 8L3 5.6" stroke="currentColor" stroke-width="1" />
+              </svg>
+            </span>
+            <span>03 / 图像特征</span>
+          </div>
+          <div class="section-rule"></div>
+          <div class="features-shell" id="featuresShell"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="s5">
+        <div class="screen-inner">
+          <div class="section-meta">
+            <span class="section-meta-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2.5" y="3" width="5.5" height="8" stroke="currentColor" stroke-width="1" />
+                <rect x="8" y="5" width="5.5" height="8" stroke="currentColor" stroke-width="1" />
+              </svg>
+            </span>
+            <span>04 / 相似竞品</span>
+          </div>
+          <div class="section-rule"></div>
+          <div class="similar-shell">
+            <div class="similar-strip" id="similarStrip"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s6">
+        <div class="screen-inner">
+          <div class="section-meta">
+            <span class="section-meta-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5.25 10.2C4.1 9.35 3.35 7.95 3.35 6.4C3.35 3.61 5.61 1.35 8.4 1.35C11.19 1.35 13.45 3.61 13.45 6.4C13.45 7.97 12.68 9.39 11.49 10.24C11 10.59 10.7 11.14 10.7 11.74V12H6.05V11.74C6.05 11.13 5.75 10.56 5.25 10.2Z" stroke="currentColor" stroke-width="1" stroke-linejoin="round" />
+                <path d="M6.5 14H10.25" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span>05 / 优化建议</span>
+          </div>
+          <div class="section-rule"></div>
+          <div class="advice-layout">
+            <div class="advice-side">
+              <div class="advice-display">建议</div>
+              <div class="advice-side-meta">
+                <div class="advice-count" id="adviceCount">共 0 条优化方向</div>
+                <div class="advice-status" id="adviceStatus">完成分析后自动请求 AI 深度分析</div>
+                <div class="advice-side-icon" id="adviceSideIcon" hidden aria-hidden="true">
+                  <svg viewBox="0 0 40 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M13 31.5C10.4 29.6 8.75 26.5 8.75 23C8.75 16.51 14.01 11.25 20.5 11.25C26.99 11.25 32.25 16.51 32.25 23C32.25 26.52 30.57 29.66 27.94 31.55C26.83 32.35 26.2 33.56 26.2 34.82V35.5H14.8V34.82C14.8 33.54 14.15 32.31 13 31.5Z"
+                      stroke="currentColor"
+                      stroke-width="1"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M15.75 39.5H25.25" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                    <path d="M17.5 43.5H23.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                    <path d="M20.5 4.5V7.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                    <path d="M9.5 9.5L11.8 11.8" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                    <path d="M31.5 9.5L29.2 11.8" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div class="advice-main">
+              <div class="advice-list" id="adviceList"></div>
+            </div>
+          </div>
+          <div class="footer-line">
+            <span>ImageIQ · 电商主图智能诊断</span>
+            <span>计算机设计大赛 2026</span>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const API_BASE = "http://localhost:8000";
+      const ANALYZE_TIMEOUT_MS = 30000;
+      const AI_ANALYSIS_TIMEOUT_MS = 30000;
+      const BACKEND_READY_TIMEOUT_MS = 12000;
+      const BACKEND_READY_POLL_MS = 500;
+      const DEFAULT_AI_TONE = "professional";
+      const AI_KEY_STORAGE_KEY = "imageiq.ai_api_key";
+      const AI_TONE_STORAGE_KEY = "imageiq.ai_tone";
+      const TONE_OPTIONS = [
+        {
+          key: "professional",
+          label: "专业分析",
+          description: "更适合汇报和正式诊断",
+          short: "专业",
+        },
+        {
+          key: "gentle",
+          label: "温和建议",
+          description: "先肯定亮点，再温和指出问题",
+          short: "温和",
+        },
+        {
+          key: "direct",
+          label: "直接犀利",
+          description: "快速定位问题，不绕弯",
+          short: "直接",
+        },
+        {
+          key: "marketing",
+          label: "增长导向",
+          description: "更聚焦点击率和转化率",
+          short: "增长",
+        },
+      ];
+
+      const FEATURE_ORDER = [
+        { key: "brightness", label: "亮度", english: "brightness" },
+        { key: "contrast", label: "对比度", english: "contrast" },
+        { key: "saturation", label: "饱和度", english: "saturation" },
+        { key: "entropy", label: "信息熵", english: "entropy" },
+        { key: "text_density", label: "文字密度", english: "text_density" },
+      ];
+
+      const app = document.getElementById("app");
+      const fileInput = document.getElementById("fileInput");
+      const dropzone = document.getElementById("dropzone");
+      const dropzoneCopy = document.getElementById("dropzoneCopy");
+      const dropzonePreviewFrame = document.getElementById("dropzonePreviewFrame");
+      const dropzonePlaceholderBox = document.getElementById("dropzonePlaceholderBox");
+      const dropzonePreview = document.getElementById("dropzonePreview");
+      const analyzeButton = document.getElementById("analyzeButton");
+      const uploadError = document.getElementById("uploadError");
+      const originalFigure = document.getElementById("originalFigure");
+      const heatmapFigure = document.getElementById("heatmapFigure");
+      const ctrOverlay = document.getElementById("ctrOverlay");
+      const ctrScoreValue = document.getElementById("ctrScoreValue");
+      const ctrScoreCopy = document.getElementById("ctrScoreCopy");
+      const featuresShell = document.getElementById("featuresShell");
+      const similarStrip = document.getElementById("similarStrip");
+      const adviceList = document.getElementById("adviceList");
+      const adviceCount = document.getElementById("adviceCount");
+      const adviceStatus = document.getElementById("adviceStatus");
+      const adviceSideIcon = document.getElementById("adviceSideIcon");
+      const adviceSideMeta = adviceCount ? adviceCount.parentElement : null;
+      const landingScreen = document.getElementById("s0");
+      const eyelidTop = document.getElementById("eyelid-top");
+      const eyelidBottom = document.getElementById("eyelid-bottom");
+      const eyelidTopLine = document.getElementById("eyelid-top-line");
+      const eyelidBottomLine = document.getElementById("eyelid-bottom-line");
+      const eyeLashes = Array.from(document.querySelectorAll("[data-eye-lash]"));
+      const configTrigger = document.getElementById("configTrigger");
+      const configStateDot = document.getElementById("configStateDot");
+      const configOverlay = document.getElementById("configOverlay");
+      const configApiKeyInput = document.getElementById("configApiKeyInput");
+      const configHelp = document.getElementById("configHelp");
+      const configError = document.getElementById("configError");
+      const configSaveButton = document.getElementById("configSaveButton");
+      const configSkipButton = document.getElementById("configSkipButton");
+      const configClearButton = document.getElementById("configClearButton");
+      const configCloseButton = document.getElementById("configCloseButton");
+      const configToneButtons = Array.from(document.querySelectorAll("[data-config-tone]"));
+      const pageNav = document.getElementById("pageNav");
+      const pageNavUnderline = document.getElementById("pageNavUnderline");
+      const pageNavLinks = Array.from(document.querySelectorAll("[data-nav-target]"));
+      const pageNavSections = pageNavLinks.map((link) => document.getElementById(link.dataset.navTarget || ""));
+      const screenNodes = Array.from(document.querySelectorAll("#app > .screen"));
+
+      const state = {
+        selectedFile: null,
+        objectUrl: "",
+        localImageMetrics: null,
+        metricsPromise: Promise.resolve(null),
+        selectionToken: 0,
+        analyzing: false,
+        aiApiKey: loadStoredAIKey(),
+        aiTone: loadStoredTone(),
+        aiAnalysis: null,
+        aiStatus: "idle",
+        aiCache: new Map(),
+        pendingAnalyzeAfterConfig: false,
+        configModalOpen: false,
+      };
+
+      window.analysisResult = null;
+      let aiRequestId = 0;
+      let featureRadarChart = null;
+
+      function escapeHTML(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function isFiniteNumber(value) {
+        return Number.isFinite(Number(value));
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function lerp(start, end, progress) {
+        return start + (end - start) * progress;
+      }
+
+      function createImagePlaceholderSVG() {
+        return `
+          <div class="figure-placeholder image" aria-hidden="true">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="16" y="14" width="88" height="62" rx="6" stroke="#CCCCCC" stroke-width="1" />
+              <circle cx="38" cy="31" r="7" stroke="#CCCCCC" stroke-width="1" />
+              <path d="M47 28L55 22L55 34Z" stroke="#CCCCCC" stroke-width="1" stroke-linejoin="round" />
+              <path d="M26 63L45 47L59 57L76 41L94 63" stroke="#CCCCCC" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+        `;
+      }
+
+      function createHeatmapPlaceholderSVG() {
+        return `
+          <div class="figure-placeholder heatmap" aria-hidden="true">
+            <svg viewBox="0 0 140 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="70" cy="40" rx="60" ry="28" stroke="#E0DDD5" stroke-width="0.5" />
+              <ellipse cx="70" cy="40" rx="38" ry="20" stroke="#CCCCCC" stroke-width="0.8" />
+              <ellipse cx="70" cy="40" rx="18" ry="11" stroke="#AAAAAA" stroke-width="1.2" />
+            </svg>
+          </div>
+        `;
+      }
+
+      function createPolarGridSVG() {
+        return `
+          <svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="150 24 274 116 226 262 74 262 26 116" stroke="currentColor" stroke-width="1" />
+            <polygon points="150 56 240 122 207 228 93 228 60 122" stroke="currentColor" stroke-width="1" />
+            <polygon points="150 88 206 128 188 194 112 194 94 128" stroke="currentColor" stroke-width="1" />
+            <path d="M150 150L150 24" stroke="currentColor" stroke-width="1" />
+            <path d="M150 150L274 116" stroke="currentColor" stroke-width="1" />
+            <path d="M150 150L226 262" stroke="currentColor" stroke-width="1" />
+            <path d="M150 150L74 262" stroke="currentColor" stroke-width="1" />
+            <path d="M150 150L26 116" stroke="currentColor" stroke-width="1" />
+          </svg>
+        `;
+      }
+
+      function renderFeatureRows(entries, options = {}) {
+        const isEmpty = Boolean(options.empty);
+        return entries
+          .map((feature, index) => {
+            const value = Number(feature.value) || 0;
+            const valueMarkup = isEmpty ? "&mdash;" : value.toFixed(2);
+            const fillClass = isEmpty ? "feature-fill is-empty" : "feature-fill";
+            const valueClass = isEmpty ? "feature-value is-empty" : "feature-value";
+
+            return `
+              <div class="feature-row" style="--delay:${index * 80}ms">
+                <div class="feature-copy">
+                  <div class="feature-name-cn">${feature.label}</div>
+                  <div class="feature-name-en">${feature.english}</div>
+                </div>
+                <div class="feature-value-wrap">
+                  <div class="${valueClass}">${valueMarkup}</div>
+                  <div class="feature-bar">
+                    <div class="${fillClass}" style="width:${(value * 100).toFixed(2)}%"></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function renderAdviceToolbar(showCopy) {
+        return `
+          <div class="advice-toolbar${showCopy ? "" : " is-tone-only"}">
+            ${
+              showCopy
+                ? `
+                  <div class="advice-toolbar-copy">
+                    切换语气只会重跑 AI 文本分析，不会重新上传图片。
+                  </div>
+                `
+                : ""
+            }
+            <div class="tone-strip">
+              ${TONE_OPTIONS.map(
+                (item) => `
+                  <button
+                    class="tone-chip${item.key === state.aiTone ? " is-active" : ""}"
+                    type="button"
+                    data-advice-tone="${item.key}"
+                  >
+                    ${escapeHTML(item.label)}
+                  </button>
+                `
+              ).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderAdviceSkeleton() {
+        return `
+          <div class="advice-skeleton" aria-hidden="true">
+            <div class="advice-skeleton-line" style="width:90%"></div>
+            <div class="advice-skeleton-line" style="width:70%"></div>
+            <div class="advice-skeleton-line" style="width:80%"></div>
+            <div class="advice-skeleton-line" style="width:60%"></div>
+          </div>
+        `;
+      }
+
+      function isLikelyTrackpadWheel(event) {
+        const absX = Math.abs(event.deltaX);
+        const absY = Math.abs(event.deltaY);
+
+        if (event.ctrlKey) {
+          return true;
+        }
+
+        if (event.deltaMode === 1) {
+          return false;
+        }
+
+        if (absX > 0) {
+          return true;
+        }
+
+        if (absY > 0 && absY < 48) {
+          return true;
+        }
+
+        if (!Number.isInteger(absY)) {
+          return true;
+        }
+
+        return false;
+      }
+
+      function setEyeOpen(progress) {
+        const open = clamp(progress, 0, 1);
+        if (eyelidTop) {
+          eyelidTop.dataset.eyeOpen = String(open);
+        }
+        const leftX = 22;
+        const rightX = 166;
+        const centerX = 94;
+        const closedCornerY = 50.5;
+        const openCornerY = 50;
+        const closedControlY = 58.5;
+        const openTopControlY = 6.5;
+        const openBottomControlY = 93.5;
+        const topOpen = Math.pow(open, 0.72);
+        const bottomOpen = Math.pow(open, 1.08);
+        const topStartY = lerp(closedCornerY, openCornerY, topOpen);
+        const topEndY = lerp(closedCornerY, openCornerY, topOpen);
+        const bottomStartY = lerp(closedCornerY, openCornerY, bottomOpen);
+        const bottomEndY = lerp(closedCornerY, openCornerY, bottomOpen);
+        const topControlY = lerp(closedControlY, openTopControlY, topOpen);
+        const bottomControlY = lerp(closedControlY, openBottomControlY, bottomOpen);
+        const topCurve = `M ${leftX} ${topStartY.toFixed(2)} Q ${centerX} ${topControlY.toFixed(
+          2
+        )} ${rightX} ${topEndY.toFixed(2)}`;
+        const bottomCurve = `M ${leftX} ${bottomStartY.toFixed(2)} Q ${centerX} ${bottomControlY.toFixed(
+          2
+        )} ${rightX} ${bottomEndY.toFixed(2)}`;
+        const topFill = `M 0 0 H 188 V ${topEndY.toFixed(2)} L ${rightX} ${topEndY.toFixed(
+          2
+        )} Q ${centerX} ${topControlY.toFixed(2)} ${leftX} ${topStartY.toFixed(
+          2
+        )} L 0 ${topStartY.toFixed(2)} Z`;
+        const bottomFill = `M 0 100 H 188 V ${bottomEndY.toFixed(2)} L ${rightX} ${bottomEndY.toFixed(
+          2
+        )} Q ${centerX} ${bottomControlY.toFixed(2)} ${leftX} ${bottomStartY.toFixed(
+          2
+        )} L 0 ${bottomStartY.toFixed(2)} Z`;
+
+        if (eyelidTop) {
+          eyelidTop.setAttribute("d", topFill);
+        }
+        if (eyelidBottom) {
+          eyelidBottom.setAttribute("d", bottomFill);
+        }
+        if (eyelidTopLine) {
+          eyelidTopLine.setAttribute("d", topCurve);
+        }
+        if (eyelidBottomLine) {
+          eyelidBottomLine.setAttribute("d", bottomCurve);
+          eyelidBottomLine.style.opacity = String(clamp((open - 0.1) / 0.28, 0, 1));
+        }
+
+        const lashConfig = [
+          { t: 0.31, closedDx: -6, closedDy: 8, openDx: -8, openDy: -13 },
+          { t: 0.39, closedDx: -5, closedDy: 10, openDx: -6, openDy: -15 },
+          { t: 0.46, closedDx: -2, closedDy: 11, openDx: -3, openDy: -15 },
+          { t: 0.53, closedDx: 0, closedDy: 12, openDx: 0, openDy: -16 },
+          { t: 0.60, closedDx: 2, closedDy: 11, openDx: 3, openDy: -15 },
+          { t: 0.67, closedDx: 5, closedDy: 10, openDx: 6, openDy: -14 },
+          { t: 0.74, closedDx: 6, closedDy: 8, openDx: 8, openDy: -12 },
+        ];
+
+        eyeLashes.forEach((lash, index) => {
+          const config = lashConfig[index];
+          if (!config) {
+            return;
+          }
+
+          const t = config.t;
+          const invT = 1 - t;
+          const x = invT * invT * leftX + 2 * invT * t * centerX + t * t * rightX;
+          const y =
+            invT * invT * topStartY +
+            2 * invT * t * topControlY +
+            t * t * topEndY;
+          const lashDx = lerp(config.closedDx, config.openDx, open);
+          const lashDy = lerp(config.closedDy, config.openDy, open);
+
+          lash.setAttribute("x1", x.toFixed(2));
+          lash.setAttribute("y1", y.toFixed(2));
+          lash.setAttribute("x2", (x + lashDx).toFixed(2));
+          lash.setAttribute("y2", (y + lashDy).toFixed(2));
+        });
+      }
+
+      function animateEyeOpen(targetOpen, duration, onComplete) {
+        const start = performance.now();
+        const startOpen = Number(eyelidTop?.dataset.eyeOpen || 0);
+
+        function step(now) {
+          const elapsed = clamp((now - start) / Math.max(duration, 1), 0, 1);
+          const eased = 1 - Math.pow(1 - elapsed, 3);
+          const nextOpen = lerp(startOpen, targetOpen, eased);
+          if (eyelidTop) {
+            eyelidTop.dataset.eyeOpen = String(nextOpen);
+          }
+          setEyeOpen(nextOpen);
+
+          if (elapsed < 1) {
+            eyeIntroFrame = window.requestAnimationFrame(step);
+            return;
+          }
+
+          if (typeof onComplete === "function") {
+            onComplete();
+          }
+        }
+
+        eyeIntroFrame = window.requestAnimationFrame(step);
+      }
+
+      function sanitizeApiKey(value) {
+        return String(value || "").trim();
+      }
+
+      function isValidTone(value) {
+        return TONE_OPTIONS.some((item) => item.key === value);
+      }
+
+      function loadStoredTone() {
+        try {
+          const stored = String(window.localStorage.getItem(AI_TONE_STORAGE_KEY) || "").trim();
+          return isValidTone(stored) ? stored : DEFAULT_AI_TONE;
+        } catch (error) {
+          return DEFAULT_AI_TONE;
+        }
+      }
+
+      function persistTone(value) {
+        const tone = isValidTone(value) ? value : DEFAULT_AI_TONE;
+        state.aiTone = tone;
+        try {
+          window.localStorage.setItem(AI_TONE_STORAGE_KEY, tone);
+        } catch (error) {
+          // 本地存储失败时，保留内存态配置即可。
+        }
+      }
+
+      function getToneMeta(value) {
+        return TONE_OPTIONS.find((item) => item.key === value) || TONE_OPTIONS[0];
+      }
+
+      function setAITone(value, options = {}) {
+        const nextTone = isValidTone(value) ? value : DEFAULT_AI_TONE;
+        const changed = state.aiTone !== nextTone;
+        persistTone(nextTone);
+        renderConfigUI();
+        renderAdvice();
+
+        if (changed && options.rerun && window.analysisResult) {
+          void requestAIAnalysis(window.analysisResult);
+        }
+      }
+
+      function loadStoredAIKey() {
+        try {
+          return sanitizeApiKey(window.localStorage.getItem(AI_KEY_STORAGE_KEY) || "");
+        } catch (error) {
+          return "";
+        }
+      }
+
+      function persistAIKey(value) {
+        const nextValue = sanitizeApiKey(value);
+        state.aiApiKey = nextValue;
+        try {
+          if (nextValue) {
+            window.localStorage.setItem(AI_KEY_STORAGE_KEY, nextValue);
+          } else {
+            window.localStorage.removeItem(AI_KEY_STORAGE_KEY);
+          }
+        } catch (error) {
+          // 本地存储失败时，保留内存态配置即可。
+        }
+      }
+
+      function maskApiKey(value) {
+        const key = sanitizeApiKey(value);
+        if (!key) {
+          return "未配置";
+        }
+        if (key.length <= 8) {
+          return `${key.slice(0, 2)}****`;
+        }
+        return `${key.slice(0, 4)}****${key.slice(-4)}`;
+      }
+
+      function buildAIAnalysisFingerprint(result) {
+        if (!result || !result.aiFeatures) {
+          return "";
+        }
+
+        return JSON.stringify({
+          features: result.aiFeatures,
+          ctrScore: result.ctr ? result.ctr.rawScore : 0,
+        });
+      }
+
+      function buildAIAnalysisCacheKey(result) {
+        const fingerprint = buildAIAnalysisFingerprint(result);
+        const normalizedApiKey = sanitizeApiKey(state.aiApiKey);
+        return `${fingerprint}::${state.aiTone}::${normalizedApiKey || "__server_default__"}`;
+      }
+
+      function normalizeUnitValue(raw, key) {
+        if (!isFiniteNumber(raw)) {
+          return 0;
+        }
+
+        let value = Number(raw);
+        if (key === "entropy" && value > 1) {
+          value = value / 8;
+        }
+
+        return clamp(value, 0, 1);
+      }
+
+      function normalizeCtrScore(rawScore) {
+        if (!isFiniteNumber(rawScore)) {
+          return 0;
+        }
+
+        const numericScore = Number(rawScore);
+        return numericScore <= 1.5 ? numericScore * 100 : numericScore;
+      }
+
+      function inferPercentile(rawPercentile, score) {
+        if (isFiniteNumber(rawPercentile)) {
+          return Math.round(clamp(Number(rawPercentile), 0, 100));
+        }
+
+        return Math.round(clamp(score, 0, 100));
+      }
+
+      function formatCompactNumber(value, digits = 2) {
+        if (!isFiniteNumber(value)) {
+          return "--";
+        }
+
+        return Number(value).toFixed(digits);
+      }
+
+      function formatPriceValue(value) {
+        if (!isFiniteNumber(value) || Number(value) <= 0) {
+          return "--";
+        }
+
+        return Number(value).toFixed(2);
+      }
+
+      function formatSimilarityPercent(value) {
+        return `${Math.round(clamp(Number(value) || 0, 0, 1) * 100)}%`;
+      }
+
+      function formatSimilarDetail(text) {
+        return String(text || "")
+          .trim()
+          .replace(/\.[a-z0-9]{2,6}$/i, "")
+          .replace(/[_-]+/g, " ");
+      }
+
+      function normalizePriority(priority) {
+        const raw = String(priority || "").trim();
+        const upper = raw.toUpperCase();
+        if (raw === "高" || upper === "HIGH") {
+          return "HIGH";
+        }
+        if (raw === "低" || upper === "LOW") {
+          return "LOW";
+        }
+        return "MEDIUM";
+      }
+
+      function getPriorityWeight(priority) {
+        const normalized = normalizePriority(priority);
+        if (normalized === "HIGH") {
+          return 0;
+        }
+        if (normalized === "MEDIUM") {
+          return 1;
+        }
+        return 2;
+      }
+
+      function sortAdviceRows(rows) {
+        return [...rows].sort((left, right) => {
+          return getPriorityWeight(left.priority) - getPriorityWeight(right.priority);
+        });
+      }
+
+      function buildFeatureEntries(result) {
+        if (!result) {
+          return [];
+        }
+
+        return FEATURE_ORDER.map((feature) => {
+          const rawValue = result.features[feature.key];
+          return {
+            ...feature,
+            rawValue,
+            value: normalizeUnitValue(rawValue, feature.key),
+          };
+        });
+      }
+
+      function destroyFeatureRadar() {
+        if (featureRadarChart) {
+          featureRadarChart.destroy();
+          featureRadarChart = null;
+        }
+      }
+
+      function renderFeatureRadar(entries) {
+        const canvas = document.getElementById("featureRadarCanvas");
+        if (!canvas || !window.Chart || !entries.length) {
+          destroyFeatureRadar();
+          return;
+        }
+
+        destroyFeatureRadar();
+        featureRadarChart = new window.Chart(canvas, {
+          type: "radar",
+          data: {
+            labels: entries.map((item) => item.label),
+            datasets: [
+              {
+                data: entries.map((item) => item.value),
+                backgroundColor: "rgba(26, 26, 26, 0.08)",
+                borderColor: "#1a1a1a",
+                pointBackgroundColor: "#1a1a1a",
+                pointBorderColor: "#faf8f3",
+                pointHoverBackgroundColor: "#1a1a1a",
+                pointHoverBorderColor: "#faf8f3",
+                pointRadius: 3.5,
+                pointHoverRadius: 4.5,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+              duration: 500,
+            },
+            scales: {
+              r: {
+                min: 0,
+                max: 1,
+                ticks: {
+                  display: false,
+                  stepSize: 0.25,
+                },
+                grid: {
+                  color: "#d8d2c7",
+                },
+                angleLines: {
+                  color: "#d8d2c7",
+                },
+                pointLabels: {
+                  color: "#1a1a1a",
+                  font: {
+                    size: 11,
+                    family: '-apple-system, "PingFang SC", sans-serif',
+                  },
+                },
+              },
+            },
+            plugins: {
+              legend: {
+                display: false,
+              },
+              tooltip: {
+                callbacks: {
+                  label(context) {
+                    return `归一化 ${Number(context.raw || 0).toFixed(2)}`;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      function getAdviceStatusText() {
+        const toneMeta = getToneMeta(state.aiTone);
+        if (!window.analysisResult) {
+          return `当前语气：${toneMeta.label}`;
+        }
+
+        if (state.aiStatus === "loading") {
+          return `当前语气：${toneMeta.label} · AI 正在生成`;
+        }
+
+        if (state.aiAnalysis && state.aiAnalysis.fallback) {
+          return `当前语气：${toneMeta.label} · 使用本地降级分析`;
+        }
+
+        if (state.aiStatus === "success") {
+          return `当前语气：${toneMeta.label} · AI 深度分析已生成`;
+        }
+
+        if (state.aiStatus === "error") {
+          return `当前语气：${toneMeta.label} · AI 请求失败`;
+        }
+
+        return `当前语气：${toneMeta.label}`;
+      }
+
+      function renderConfigUI() {
+        const hasKey = Boolean(state.aiApiKey);
+        const toneMeta = getToneMeta(state.aiTone);
+        configTrigger.classList.toggle("is-configured", hasKey);
+        configTrigger.title = hasKey
+          ? `AI API Key 已配置 · 当前语气 ${toneMeta.label}`
+          : `配置 AI API Key · 当前语气 ${toneMeta.label}`;
+        configStateDot.setAttribute("aria-label", hasKey ? "已配置" : "未配置");
+        configClearButton.hidden = !hasKey;
+        configToneButtons.forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.configTone === state.aiTone);
+        });
+
+        if (!state.configModalOpen) {
+          return;
+        }
+
+        configHelp.textContent = hasKey
+          ? `当前已保存：${maskApiKey(state.aiApiKey)}。语气：${toneMeta.label}。仅保存在当前浏览器。`
+          : `当前状态：未配置。语气：${toneMeta.label}。仅保存在当前浏览器。`;
+        configSaveButton.textContent = state.pendingAnalyzeAfterConfig ? "保存并分析" : "保存配置";
+        configSkipButton.textContent = state.pendingAnalyzeAfterConfig
+          ? "暂不配置，继续分析"
+          : "关闭";
+      }
+
+      function closeConfigModal() {
+        state.pendingAnalyzeAfterConfig = false;
+        state.configModalOpen = false;
+        configOverlay.classList.remove("is-open");
+        window.setTimeout(() => {
+          if (!state.configModalOpen) {
+            configOverlay.hidden = true;
+          }
+        }, 220);
+      }
+
+      function openConfigModal(options = {}) {
+        state.pendingAnalyzeAfterConfig = Boolean(options.pendingAnalyze);
+        state.configModalOpen = true;
+        configOverlay.hidden = false;
+        configApiKeyInput.value = state.aiApiKey;
+        configError.textContent = "";
+        renderConfigUI();
+        window.requestAnimationFrame(() => {
+          configOverlay.classList.add("is-open");
+          configApiKeyInput.focus();
+          configApiKeyInput.select();
+        });
+      }
+
+      function handleConfigSave() {
+        const apiKey = sanitizeApiKey(configApiKeyInput.value);
+        if (!apiKey) {
+          configError.textContent = "请输入 API Key，或选择“暂不配置”。";
+          configApiKeyInput.focus();
+          return;
+        }
+
+        const shouldAnalyze = state.pendingAnalyzeAfterConfig;
+        persistAIKey(apiKey);
+        renderConfigUI();
+        closeConfigModal();
+        renderAll();
+
+        if (shouldAnalyze) {
+          void handleAnalyze({ allowWithoutKey: false });
+        } else if (window.analysisResult) {
+          void requestAIAnalysis(window.analysisResult);
+        }
+      }
+
+      function handleConfigSkip() {
+        const shouldAnalyze = state.pendingAnalyzeAfterConfig;
+        configError.textContent = "";
+        closeConfigModal();
+        renderAll();
+
+        if (shouldAnalyze) {
+          void handleAnalyze({ allowWithoutKey: true });
+        }
+      }
+
+      function handleConfigClear() {
+        persistAIKey("");
+        configApiKeyInput.value = "";
+        configError.textContent = "";
+        renderConfigUI();
+        renderAll();
+
+        if (window.analysisResult) {
+          void requestAIAnalysis(window.analysisResult);
+        }
+      }
+
+      function updateAnalyzeButton() {
+        analyzeButton.disabled = !state.selectedFile || state.analyzing;
+        analyzeButton.textContent = state.analyzing ? "分析中..." : "开始分析 →";
+      }
+
+      function setUploadError(message) {
+        uploadError.textContent = message || "";
+      }
+
+      function revokePreviewUrl() {
+        if (state.objectUrl) {
+          URL.revokeObjectURL(state.objectUrl);
+          state.objectUrl = "";
+        }
+      }
+
+      function renderUploadPreview() {
+        if (state.objectUrl) {
+          dropzone.classList.add("has-image");
+          dropzonePreviewFrame.classList.add("has-image");
+          dropzonePlaceholderBox.hidden = true;
+          dropzonePreview.hidden = false;
+          dropzonePreview.style.backgroundImage = `url("${state.objectUrl}")`;
+        } else {
+          dropzone.classList.remove("has-image");
+          dropzonePreviewFrame.classList.remove("has-image");
+          dropzonePlaceholderBox.hidden = false;
+          dropzonePreview.hidden = true;
+          dropzonePreview.style.backgroundImage = "none";
+        }
+      }
+
+      function fetchWithTimeout(url, options, timeoutMs) {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+        return fetch(url, { ...options, signal: controller.signal }).finally(() => {
+          window.clearTimeout(timer);
+        });
+      }
+
+      async function isBackendReachable() {
+        try {
+          const response = await fetchWithTimeout(`${API_BASE}/health`, {}, BACKEND_READY_POLL_MS);
+          if (!response.ok) {
+            return false;
+          }
+
+          const data = await response.json().catch(() => null);
+          return data?.status === "ok";
+        } catch (error) {
+          return false;
+        }
+      }
+
+      async function waitForBackendReady(
+        timeoutMs = BACKEND_READY_TIMEOUT_MS,
+        pollMs = BACKEND_READY_POLL_MS
+      ) {
+        const deadline = Date.now() + timeoutMs;
+
+        while (Date.now() < deadline) {
+          if (await isBackendReachable()) {
+            return true;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, pollMs));
+        }
+
+        return false;
+      }
+
+      async function fetchAIAnalysis(features, ctrScore) {
+        const response = await fetchWithTimeout(
+          `${API_BASE}/ai-analysis`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tone: state.aiTone,
+              features,
+              ctr_score: ctrScore,
+              api_key: state.aiApiKey || undefined,
+            }),
+          },
+          AI_ANALYSIS_TIMEOUT_MS
+        );
+
+        const payload = await response.json().catch(() => ({
+          success: false,
+          error: "AI 分析请求失败，请稍后重试。",
+        }));
+
+        return {
+          tone: payload.tone || state.aiTone,
+          summary: payload.summary || "",
+          strengths: Array.isArray(payload.strengths) ? payload.strengths : [],
+          problems: Array.isArray(payload.problems) ? payload.problems : [],
+          suggestions: Array.isArray(payload.suggestions) ? payload.suggestions : [],
+          success: Boolean(payload.success ?? response.ok),
+          fallback: Boolean(payload.fallback),
+          source: payload.source || "",
+          error: payload.error || "",
+        };
+      }
+
+      function buildRuleSuggestionRows(result) {
+        const rows =
+          result && Array.isArray(result.advice)
+            ? result.advice.map((item) => ({
+                priority: item.priority,
+                category: item.category || "GENERAL",
+                issue: item.issue || "暂无问题描述",
+                suggestion: item.suggestion || "暂无优化建议",
+              }))
+            : [];
+
+        return sortAdviceRows(rows);
+      }
+
+      function buildAISuggestionRows(aiAnalysis) {
+        const rows =
+          aiAnalysis && aiAnalysis.success
+            ? aiAnalysis.suggestions.map((item) => ({
+                priority: "MEDIUM",
+                category: "新增方向",
+                issue: item,
+                suggestion: "可作为下一轮主图优化方向。",
+              }))
+            : [];
+
+        return sortAdviceRows(rows);
+      }
+
+      function renderAnalysisCard(title, items, options = {}) {
+        const note = options.note ? `<div class="analysis-card-note">${escapeHTML(options.note)}</div>` : "";
+        const body = items && items.length
+          ? `
+              <ul class="analysis-list">
+                ${items
+                  .map(
+                    (item) => `
+                      <li class="analysis-item">
+                        <span class="analysis-item-mark">•</span>
+                        <span>${escapeHTML(item)}</span>
+                      </li>
+                    `
+                  )
+                  .join("")}
+              </ul>
+            `
+          : `<div class="advice-inline-empty">${escapeHTML(
+              options.emptyText || "当前暂无可展示内容。"
+            )}</div>`;
+
+        return `
+          <article class="analysis-card">
+            <div class="analysis-card-head">
+              <div class="analysis-card-title">${escapeHTML(title)}</div>
+              ${note}
+            </div>
+            ${body}
+          </article>
+        `;
+      }
+
+      function renderAdviceRows(rows) {
+        return rows
+          .map((item) => {
+            const priority = normalizePriority(item.priority);
+            const badgeClass =
+              priority === "HIGH" ? "high" : priority === "LOW" ? "low" : "medium";
+
+            return `
+              <div class="advice-row">
+                <div><span class="badge ${badgeClass}">${escapeHTML(priority)}</span></div>
+                <div>
+                  <div class="advice-category">${escapeHTML(item.category || "GENERAL")}</div>
+                  <div class="advice-issue">${escapeHTML(item.issue || "暂无问题描述")}</div>
+                  <div class="advice-suggestion">${escapeHTML(item.suggestion || "暂无优化建议")}</div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function renderAdviceGroup(title, note, rows, emptyText) {
+        return `
+          <div class="advice-group-block">
+            <div class="advice-group-head">
+              <div class="advice-group-title">${escapeHTML(title)}</div>
+              <div class="advice-group-note">${escapeHTML(note)}</div>
+            </div>
+            ${
+              rows.length
+                ? renderAdviceRows(rows)
+                : `<div class="advice-inline-empty">${escapeHTML(emptyText)}</div>`
+            }
+          </div>
+        `;
+      }
+
+      function renderAnalysisPanel(aiAnalysis) {
+        const toneMeta = getToneMeta(state.aiTone);
+        if (!window.analysisResult) {
+          return '<div class="empty-state">请先完成分析，系统会在这里展示 AI 总结、亮点与问题。</div>';
+        }
+
+        if (state.aiStatus === "loading") {
+          return `<div class="empty-state">AI 正在按“${escapeHTML(
+            toneMeta.label
+          )}”语气生成分析，请稍候。</div>`;
+        }
+
+        if (!aiAnalysis) {
+          return '<div class="empty-state">分析完成后，这里会自动显示 AI 诊断内容。</div>';
+        }
+
+        if (!aiAnalysis.success) {
+          return `<div class="empty-state">${escapeHTML(
+            aiAnalysis.error || "AI 分析暂时不可用。"
+          )}</div>`;
+        }
+
+        return `
+          <div class="analysis-shell">
+            ${
+              aiAnalysis.summary
+                ? `
+                  <article class="analysis-card summary">
+                    <div class="analysis-card-head">
+                      <div class="analysis-card-title">AI 摘要</div>
+                      <div class="analysis-card-note">${escapeHTML(toneMeta.label)}</div>
+                    </div>
+                    <div class="analysis-summary">${escapeHTML(aiAnalysis.summary)}</div>
+                  </article>
+                `
+                : ""
+            }
+            ${renderAnalysisCard("亮点", aiAnalysis.strengths, {
+              note: aiAnalysis.strengths.length ? `${aiAnalysis.strengths.length} 条` : "",
+              emptyText: "当前没有总结出明显亮点。",
+            })}
+            ${renderAnalysisCard("问题", aiAnalysis.problems, {
+              note: aiAnalysis.problems.length ? `${aiAnalysis.problems.length} 条` : "",
+              emptyText: "当前没有总结出主要问题。",
+            })}
+          </div>
+        `;
+      }
+
+      async function requestAIAnalysis(result) {
+        if (!result || !result.aiFeatures) {
+          state.aiAnalysis = null;
+          state.aiStatus = "idle";
+          renderAdvice();
+          return;
+        }
+
+        const cacheKey = buildAIAnalysisCacheKey(result);
+        const cached = state.aiCache.get(cacheKey);
+        if (cached) {
+          state.aiAnalysis = cached;
+          state.aiStatus = cached.success ? "success" : "error";
+          renderAdvice();
+          return;
+        }
+
+        const requestId = aiRequestId + 1;
+        aiRequestId = requestId;
+        state.aiAnalysis = null;
+        state.aiStatus = "loading";
+        renderAdvice();
+
+        try {
+          const aiAnalysis = await fetchAIAnalysis(result.aiFeatures, result.ctr.rawScore);
+          if (requestId !== aiRequestId) {
+            return;
+          }
+
+          state.aiCache.set(cacheKey, aiAnalysis);
+          state.aiAnalysis = aiAnalysis;
+          state.aiStatus = aiAnalysis.success ? "success" : "error";
+          renderAdvice();
+        } catch (error) {
+          if (requestId !== aiRequestId) {
+            return;
+          }
+
+          state.aiAnalysis = {
+            success: false,
+            fallback: false,
+            source: "",
+            error:
+              error && error.name === "AbortError"
+                ? "AI 分析超时，请稍后重试。"
+                : "AI 分析请求失败，请稍后重试。",
+            summary: "",
+            strengths: [],
+            problems: [],
+            suggestions: [],
+            tone: state.aiTone,
+          };
+          state.aiStatus = "error";
+          renderAdvice();
+        }
+      }
+
+      function renderHeatmap() {
+        const result = window.analysisResult;
+        const originalSrc = state.objectUrl || "";
+        const heatmapSrc =
+          result && result.heatmap_base64
+            ? `data:image/png;base64,${result.heatmap_base64}`
+            : "";
+
+        originalFigure.classList.toggle("has-image", Boolean(originalSrc));
+        heatmapFigure.classList.toggle("has-image", Boolean(heatmapSrc));
+        originalFigure.innerHTML = originalSrc
+          ? `<img src="${originalSrc}" alt="${escapeHTML("原图")}" />`
+          : createImagePlaceholderSVG();
+        heatmapFigure.innerHTML = heatmapSrc
+          ? `<img src="${heatmapSrc}" alt="${escapeHTML("注意力热力图")}" />`
+          : createHeatmapPlaceholderSVG();
+
+        if (result) {
+          ctrOverlay.classList.remove("is-hidden");
+          ctrScoreValue.textContent = result.ctr.score.toFixed(1);
+          ctrScoreCopy.textContent = `CTR 评分 · 超越 ${result.ctr.percentile}% 竞品`;
+        } else {
+          ctrOverlay.classList.add("is-hidden");
+          ctrScoreValue.textContent = "--";
+          ctrScoreCopy.textContent = "CTR 评分 · 等待分析结果";
+        }
+      }
+
+      function renderFeatures() {
+        const result = window.analysisResult;
+        destroyFeatureRadar();
+
+        if (!result) {
+          const emptyEntries = FEATURE_ORDER.map((feature) => ({
+            ...feature,
+            value: 0,
+          }));
+          featuresShell.innerHTML = `
+            <div class="features-layout is-empty">
+              <div class="feature-list">${renderFeatureRows(emptyEntries, { empty: true })}</div>
+            </div>
+          `;
+          return;
+        }
+
+        const entries = buildFeatureEntries(result);
+
+        featuresShell.innerHTML = `
+          <div class="features-layout">
+            <div class="feature-radar-panel">
+              <div class="feature-radar-meta">归一化雷达图 · 五项特征</div>
+              <div class="feature-radar-frame">
+                <canvas id="featureRadarCanvas" class="feature-radar-canvas"></canvas>
+              </div>
+            </div>
+            <div class="feature-list">${renderFeatureRows(entries)}</div>
+          </div>
+        `;
+
+        window.requestAnimationFrame(() => renderFeatureRadar(entries));
+      }
+
+      function renderSimilarSkeletonCards(count) {
+        return Array.from({ length: count }, () => {
+          return `
+            <article class="similar-card is-skeleton" aria-hidden="true">
+              <div class="similar-skeleton-visual"></div>
+              <div class="similar-skeleton-meta">
+                <div class="similar-skeleton-line long"></div>
+                <div class="similar-skeleton-line short"></div>
+              </div>
+            </article>
+          `;
+        }).join("");
+      }
+
+      function renderSimilar() {
+        const result = window.analysisResult;
+        const items = result && Array.isArray(result.similar) ? result.similar.slice(0, 5) : [];
+
+        if (!items.length) {
+          similarStrip.classList.add("is-placeholder");
+          similarStrip.classList.remove("dragging");
+          similarStrip.innerHTML = renderSimilarSkeletonCards(5);
+          return;
+        }
+
+        similarStrip.classList.remove("is-placeholder");
+        similarStrip.innerHTML = items
+          .map((item) => {
+            const similarityText = formatSimilarityPercent(item.similarity);
+            const priceText = formatPriceValue(item.price);
+            const ctrText = formatCompactNumber(item.relative_ctr);
+            const primaryName = item.title || item.dataset_name || item.img_name || `竞品 ${item.rank}`;
+            const kickerText =
+              item.dataset_name && item.dataset_name !== primaryName ? item.dataset_name : "相似竞品";
+            const detailTextCandidates = [
+              formatSimilarDetail(item.img_name),
+              item.dataset_key,
+            ].filter(Boolean);
+            const detailText = detailTextCandidates.find(
+              (text) => text && text !== primaryName && text !== kickerText
+            ) || "";
+            const rankText = String(item.rank).padStart(2, "0");
+            const imageNode = item.img_base64
+              ? `<img src="data:image/png;base64,${item.img_base64}" alt="${escapeHTML(
+                  primaryName
+                )}" />`
+              : '<div class="similar-image-placeholder" aria-hidden="true"></div>';
+
+            return `
+              <article class="similar-card">
+                <div class="similar-index">No.${escapeHTML(rankText)}</div>
+                <div class="similar-image">${imageNode}</div>
+                <div class="similar-value">${similarityText}</div>
+                <div class="similar-copy">与上传图相似度</div>
+                <div class="similar-kicker">${escapeHTML(kickerText)}</div>
+                <div class="similar-name">${escapeHTML(primaryName)}</div>
+                <div class="similar-detail">${escapeHTML(detailText)}</div>
+                <div class="similar-metrics">
+                  <div class="similar-metric">
+                    <div class="similar-metric-label">
+                      <span class="similar-metric-icon" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2.5 12.5H13.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                          <path d="M4 10L6.6 7.4L8.5 9.3L12 5.8" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </span>
+                      <span>CTR 相对值</span>
+                    </div>
+                    <div class="similar-metric-value">${ctrText}</div>
+                  </div>
+                  <div class="similar-metric">
+                    <div class="similar-metric-label">
+                      <span class="similar-metric-icon" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M3 4.5H13L12 12H4L3 4.5Z" stroke="currentColor" stroke-width="1" stroke-linejoin="round" />
+                          <path d="M6 4.5V3.6C6 2.72 6.72 2 7.6 2H8.4C9.28 2 10 2.72 10 3.6V4.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+                        </svg>
+                      </span>
+                      <span>价格</span>
+                    </div>
+                    <div class="similar-metric-value similar-price">${
+                      priceText === "--" ? "--" : `¥ ${priceText}`
+                    }</div>
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      function renderAdvice() {
+        const result = window.analysisResult;
+        const toneMeta = getToneMeta(state.aiTone);
+        const aiRows = buildAISuggestionRows(state.aiAnalysis);
+        const totalRows = aiRows.length;
+
+        if (!result) {
+          adviceCount.textContent = "";
+          adviceStatus.textContent = "";
+          if (adviceSideMeta) {
+            adviceSideMeta.classList.add("is-empty");
+          }
+          if (adviceSideIcon) {
+            adviceSideIcon.hidden = false;
+          }
+          adviceList.innerHTML = `
+            <div class="advice-stack">
+              ${renderAdviceToolbar(false)}
+              ${renderAdviceSkeleton()}
+            </div>
+          `;
+          return;
+        }
+
+        if (adviceSideMeta) {
+          adviceSideMeta.classList.remove("is-empty");
+        }
+        if (adviceSideIcon) {
+          adviceSideIcon.hidden = true;
+        }
+        adviceStatus.textContent = getAdviceStatusText();
+        adviceCount.textContent = `共 ${totalRows} 条优化建议`;
+
+        const aiGroupMode = state.aiAnalysis && state.aiAnalysis.fallback ? "本地降级" : toneMeta.label;
+        const aiGroupNote =
+          state.aiStatus === "loading"
+            ? `${aiGroupMode} · 生成中`
+            : state.aiAnalysis && state.aiAnalysis.success
+            ? `${aiGroupMode} · ${aiRows.length} 条`
+            : aiGroupMode;
+        const aiEmptyText =
+          state.aiStatus === "loading"
+            ? "AI 正在生成这一组延展建议。"
+            : state.aiAnalysis && !state.aiAnalysis.success
+            ? state.aiAnalysis.error || "AI 建议暂时不可用。"
+            : "分析完成后会在这里补充 AI 延展建议。";
+
+        adviceList.innerHTML = `
+          <div class="advice-stack">
+            ${renderAdviceToolbar(true)}
+
+            <section class="advice-section">
+              <div class="advice-section-head">
+                <div class="advice-section-title">分析</div>
+                <div class="advice-section-note">${escapeHTML(toneMeta.label)}</div>
+              </div>
+              ${renderAnalysisPanel(state.aiAnalysis)}
+            </section>
+
+            <section class="advice-section">
+              <div class="advice-section-head">
+                <div class="advice-section-title">建议</div>
+                <div class="advice-section-note">${totalRows} 条可执行方向</div>
+              </div>
+              <div class="advice-groups">
+                ${renderAdviceGroup("AI 延展", aiGroupNote, aiRows, aiEmptyText)}
+              </div>
+            </section>
+          </div>
+        `;
+      }
+
+      function renderAll() {
+        renderConfigUI();
+        renderUploadPreview();
+        updateAnalyzeButton();
+        renderHeatmap();
+        renderFeatures();
+        renderSimilar();
+        renderAdvice();
+      }
+
+      async function computeImageMetrics(src) {
+        if (!src) {
+          return null;
+        }
+
+        return new Promise((resolve) => {
+          const image = new Image();
+          image.onload = () => {
+            const maxSide = 240;
+            const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+            const width = Math.max(1, Math.round(image.naturalWidth * scale));
+            const height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+
+            if (!context) {
+              resolve(null);
+              return;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(image, 0, 0, width, height);
+
+            const { data } = context.getImageData(0, 0, width, height);
+            const lumaValues = [];
+            let lumaSum = 0;
+            let saturationSum = 0;
+            let count = 0;
+
+            for (let i = 0; i < data.length; i += 4) {
+              const alpha = data[i + 3];
+              if (alpha === 0) {
+                continue;
+              }
+
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+              const saturation = max === 0 ? 0 : (max - min) / max;
+
+              lumaValues.push(luma);
+              lumaSum += luma;
+              saturationSum += saturation;
+              count += 1;
+            }
+
+            if (!count) {
+              resolve({
+                brightness: 0,
+                contrast: 0,
+                saturation: 0,
+              });
+              return;
+            }
+
+            const meanLuma = lumaSum / count;
+            let variance = 0;
+            for (const luma of lumaValues) {
+              const offset = luma - meanLuma;
+              variance += offset * offset;
+            }
+
+            resolve({
+              brightness: clamp(meanLuma / 255, 0, 1),
+              contrast: clamp(Math.sqrt(variance / count) / 128, 0, 1),
+              saturation: clamp(saturationSum / count, 0, 1),
+            });
+          };
+
+          image.onerror = () => resolve(null);
+          image.src = src;
+        });
+      }
+
+      function normalizeResult(payload) {
+        const features = payload && typeof payload === "object" ? payload.features || {} : {};
+        const ctr = payload && typeof payload === "object" ? payload.ctr || {} : {};
+        const derived = state.localImageMetrics || {};
+        const score = normalizeCtrScore(ctr.score);
+
+        return {
+          features: {
+            brightness: normalizeUnitValue(
+              isFiniteNumber(features.brightness) ? features.brightness : derived.brightness,
+              "brightness"
+            ),
+            contrast: normalizeUnitValue(
+              isFiniteNumber(features.contrast) ? features.contrast : derived.contrast,
+              "contrast"
+            ),
+            saturation: normalizeUnitValue(
+              isFiniteNumber(features.saturation)
+                ? features.saturation
+                : isFiniteNumber(features.color_saturation)
+                ? features.color_saturation
+                : derived.saturation,
+              "saturation"
+            ),
+            entropy: normalizeUnitValue(features.entropy, "entropy"),
+            text_density: normalizeUnitValue(features.text_density, "text_density"),
+          },
+          ctr: {
+            score,
+            rawScore: isFiniteNumber(ctr.score) ? Number(ctr.score) : 0,
+            percentile: inferPercentile(ctr.percentile, score),
+          },
+          aiFeatures: {
+            entropy: isFiniteNumber(features.entropy) ? Number(features.entropy) : 0,
+            text_density: isFiniteNumber(features.text_density) ? Number(features.text_density) : 0,
+            subject_area_ratio: isFiniteNumber(features.subject_area_ratio)
+              ? Number(features.subject_area_ratio)
+              : 0,
+            edge_density: isFiniteNumber(features.edge_density) ? Number(features.edge_density) : 0,
+            color_saturation: isFiniteNumber(features.color_saturation)
+              ? Number(features.color_saturation)
+              : 0,
+          },
+          heatmap_base64: typeof payload.heatmap_base64 === "string" ? payload.heatmap_base64 : "",
+          similar: Array.isArray(payload.similar)
+            ? payload.similar.map((item, index) => ({
+                rank: isFiniteNumber(item.rank) ? Number(item.rank) : index + 1,
+                dataset_key: item.dataset_key || "",
+                dataset_name: item.dataset_name || "",
+                title: item.title || "",
+                img_name: item.img_name || "",
+                similarity: clamp(Number(item.similarity) || 0, 0, 1),
+                relative_ctr: Number(item.relative_ctr) || 0,
+                price: Number(item.price) || 0,
+                img_base64: item.img_base64 || null,
+              }))
+            : [],
+          advice: Array.isArray(payload.advice) ? payload.advice : [],
+          raw: payload,
+        };
+      }
+
+      async function selectFile(file) {
+        if (!file) {
+          return;
+        }
+
+        state.selectedFile = file;
+        state.selectionToken += 1;
+        const token = state.selectionToken;
+        window.analysisResult = null;
+        aiRequestId += 1;
+        state.aiAnalysis = null;
+        state.aiStatus = "idle";
+        state.localImageMetrics = null;
+        revokePreviewUrl();
+        state.objectUrl = URL.createObjectURL(file);
+        setUploadError("");
+        renderAll();
+
+        state.metricsPromise = computeImageMetrics(state.objectUrl)
+          .then((metrics) => {
+            if (token === state.selectionToken) {
+              state.localImageMetrics = metrics;
+            }
+            return metrics;
+          })
+          .catch(() => null);
+      }
+
+      async function handleAnalyze(options = {}) {
+        const allowWithoutKey = Boolean(options.allowWithoutKey);
+        if (!state.selectedFile || state.analyzing) {
+          return;
+        }
+
+        if (!state.aiApiKey && !allowWithoutKey) {
+          openConfigModal({ pendingAnalyze: true });
+          return;
+        }
+
+        state.analyzing = true;
+        setUploadError("");
+        updateAnalyzeButton();
+
+        try {
+          await state.metricsPromise.catch(() => null);
+
+          const formData = new FormData();
+          formData.append("file", state.selectedFile);
+
+          let response;
+          try {
+            response = await fetchWithTimeout(
+              `${API_BASE}/analyze`,
+              {
+                method: "POST",
+                body: formData,
+              },
+              ANALYZE_TIMEOUT_MS
+            );
+          } catch (error) {
+            const backendReady = await waitForBackendReady();
+            if (!backendReady) {
+              throw error;
+            }
+
+            response = await fetchWithTimeout(
+              `${API_BASE}/analyze`,
+              {
+                method: "POST",
+                body: formData,
+              },
+              ANALYZE_TIMEOUT_MS
+            );
+          }
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.error || `请求失败（${response.status}）`);
+          }
+
+          window.analysisResult = normalizeResult(payload);
+          state.aiAnalysis = null;
+          renderAll();
+          document.getElementById("s3").scrollIntoView({ behavior: "smooth", block: "start" });
+          void requestAIAnalysis(window.analysisResult);
+        } catch (error) {
+          const message =
+            error && error.name === "AbortError"
+              ? "分析超时，请检查后端状态或稍后重试。"
+              : error && error.message
+              ? error.message
+              : "分析失败，请稍后重试。";
+          setUploadError(message);
+        } finally {
+          state.analyzing = false;
+          updateAnalyzeButton();
+        }
+      }
+
+      function enableSimilarDrag(container) {
+        let active = false;
+        let startX = 0;
+        let startScrollLeft = 0;
+        let pointerId = null;
+
+        container.addEventListener("pointerdown", (event) => {
+          if (container.classList.contains("is-placeholder")) {
+            return;
+          }
+
+          active = true;
+          pointerId = event.pointerId;
+          startX = event.clientX;
+          startScrollLeft = container.scrollLeft;
+          container.classList.add("dragging");
+          container.setPointerCapture(pointerId);
+        });
+
+        container.addEventListener("pointermove", (event) => {
+          if (!active) {
+            return;
+          }
+
+          const delta = event.clientX - startX;
+          container.scrollLeft = startScrollLeft - delta;
+        });
+
+        function endDrag() {
+          if (!active) {
+            return;
+          }
+
+          active = false;
+          container.classList.remove("dragging");
+          if (pointerId !== null) {
+            try {
+              container.releasePointerCapture(pointerId);
+            } catch (error) {
+              // 指针释放失败时不影响后续交互。
+            }
+          }
+          pointerId = null;
+        }
+
+        container.addEventListener("pointerup", endDrag);
+        container.addEventListener("pointercancel", endDrag);
+        container.addEventListener("pointerleave", (event) => {
+          if (active && event.buttons === 0) {
+            endDrag();
+          }
+        });
+      }
+
+      function updatePageNav() {
+        if (
+          !pageNav ||
+          !pageNavUnderline ||
+          !pageNavLinks.length ||
+          pageNavSections.some((section) => !section)
+        ) {
+          return;
+        }
+
+        const firstSection = pageNavSections[0];
+        const revealThreshold = Math.max(
+          firstSection.offsetTop - landingScreen.clientHeight * 0.25,
+          landingScreen.clientHeight * 0.5
+        );
+        const shouldShow = app.scrollTop >= revealThreshold;
+        const navRect = pageNav.getBoundingClientRect();
+        const metrics = pageNavLinks.map((link) => {
+          const rect = link.getBoundingClientRect();
+          return {
+            left: rect.left - navRect.left,
+            width: rect.width,
+          };
+        });
+
+        pageNav.classList.toggle("is-visible", shouldShow);
+        pageNav.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+
+        if (!metrics.length) {
+          return;
+        }
+
+        const sectionOffsets = pageNavSections.map((section) => section.offsetTop);
+        const scrollTop = app.scrollTop;
+        let fromIndex = 0;
+        let toIndex = 0;
+        let progress = 0;
+
+        if (scrollTop <= sectionOffsets[0]) {
+          fromIndex = 0;
+          toIndex = 0;
+        } else if (scrollTop >= sectionOffsets[sectionOffsets.length - 1]) {
+          fromIndex = sectionOffsets.length - 1;
+          toIndex = fromIndex;
+        } else {
+          for (let index = 0; index < sectionOffsets.length - 1; index += 1) {
+            const start = sectionOffsets[index];
+            const end = sectionOffsets[index + 1];
+            if (scrollTop >= start && scrollTop < end) {
+              fromIndex = index;
+              toIndex = index + 1;
+              progress = clamp((scrollTop - start) / Math.max(end - start, 1), 0, 1);
+              break;
+            }
+          }
+        }
+
+        const left = lerp(metrics[fromIndex].left, metrics[toIndex].left, progress);
+        const width = lerp(metrics[fromIndex].width, metrics[toIndex].width, progress);
+        const activeIndex = progress >= 0.5 ? toIndex : fromIndex;
+
+        pageNavUnderline.style.opacity = shouldShow ? "1" : "0";
+        pageNavUnderline.style.transform = `translate3d(${left.toFixed(2)}px, 0, 0) scaleX(${Math.max(
+          width,
+          1
+        ).toFixed(4)})`;
+
+        pageNavLinks.forEach((link, index) => {
+          link.classList.toggle("is-active", shouldShow && index === activeIndex);
+        });
+      }
+
+      let landingProgressFrame = 0;
+      let wheelScrollLocked = false;
+      let wheelScrollUnlockTimer = 0;
+      let eyeIntroStartTimer = 0;
+      let eyeIntroFrame = 0;
+      let eyeScrollControlEnabled = false;
+
+      function updateLandingProgress() {
+        const scrollRatio = clamp(app.scrollTop / Math.max(window.innerHeight * 0.5, 1), 0, 1);
+        landingScreen.style.setProperty("--scroll-progress", scrollRatio.toFixed(4));
+        if (!eyeScrollControlEnabled && app.scrollTop > 2) {
+          window.clearTimeout(eyeIntroStartTimer);
+          window.cancelAnimationFrame(eyeIntroFrame);
+          eyeScrollControlEnabled = true;
+        }
+        if (eyeScrollControlEnabled) {
+          const eyeProgress = scrollRatio;
+          setEyeOpen(eyeProgress);
+        }
+        updatePageNav();
+      }
+
+      function queueLandingProgress() {
+        if (landingProgressFrame) {
+          return;
+        }
+
+        landingProgressFrame = window.requestAnimationFrame(() => {
+          landingProgressFrame = 0;
+          updateLandingProgress();
+        });
+      }
+
+      function setupSectionObservers() {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+              }
+            });
+          },
+          {
+            root: app,
+            threshold: 0.5,
+          }
+        );
+
+        document.querySelectorAll("#s3, #s4").forEach((section) => observer.observe(section));
+      }
+
+      function canElementScrollInDirection(node, deltaY) {
+        if (!(node instanceof HTMLElement)) {
+          return false;
+        }
+
+        const style = window.getComputedStyle(node);
+        if (!/(auto|scroll|overlay)/.test(style.overflowY)) {
+          return false;
+        }
+
+        if (node.scrollHeight <= node.clientHeight + 1) {
+          return false;
+        }
+
+        if (deltaY > 0) {
+          return node.scrollTop + node.clientHeight < node.scrollHeight - 1;
+        }
+
+        if (deltaY < 0) {
+          return node.scrollTop > 1;
+        }
+
+        return false;
+      }
+
+      function hasInnerWheelTarget(event) {
+        let node = event.target instanceof Element ? event.target : null;
+
+        while (node && node !== app) {
+          if (canElementScrollInDirection(node, event.deltaY)) {
+            return true;
+          }
+          node = node.parentElement;
+        }
+
+        return false;
+      }
+
+      function handleAppWheel(event) {
+        if (Math.abs(event.deltaY) < Math.abs(event.deltaX) || event.deltaY === 0) {
+          return;
+        }
+
+        if (hasInnerWheelTarget(event)) {
+          return;
+        }
+
+        if (isLikelyTrackpadWheel(event)) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (wheelScrollLocked) {
+          return;
+        }
+
+        const direction = event.deltaY > 0 ? 1 : -1;
+        const currentIndex = screenNodes.reduce((closestIndex, section, index) => {
+          const closestDistance = Math.abs(screenNodes[closestIndex].offsetTop - app.scrollTop);
+          const nextDistance = Math.abs(section.offsetTop - app.scrollTop);
+          return nextDistance < closestDistance ? index : closestIndex;
+        }, 0);
+        const targetIndex = clamp(currentIndex + direction, 0, Math.max(screenNodes.length - 1, 0));
+
+        if (targetIndex === currentIndex) {
+          return;
+        }
+
+        wheelScrollLocked = true;
+        app.scrollTo({ top: screenNodes[targetIndex].offsetTop, behavior: "smooth" });
+        window.clearTimeout(wheelScrollUnlockTimer);
+        wheelScrollUnlockTimer = window.setTimeout(() => {
+          wheelScrollLocked = false;
+        }, 800);
+      }
+
+      fileInput.addEventListener("change", async (event) => {
+        const [file] = event.target.files || [];
+        await selectFile(file);
+      });
+
+      configTrigger.addEventListener("click", () => {
+        openConfigModal();
+      });
+
+      configSaveButton.addEventListener("click", () => {
+        handleConfigSave();
+      });
+
+      configToneButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextTone = button.dataset.configTone || DEFAULT_AI_TONE;
+          setAITone(nextTone, {
+            rerun: Boolean(window.analysisResult) && !state.pendingAnalyzeAfterConfig,
+          });
+        });
+      });
+
+      configSkipButton.addEventListener("click", () => {
+        handleConfigSkip();
+      });
+
+      configClearButton.addEventListener("click", () => {
+        handleConfigClear();
+      });
+
+      configCloseButton.addEventListener("click", () => {
+        closeConfigModal();
+      });
+
+      configApiKeyInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          handleConfigSave();
+        }
+      });
+
+      configOverlay.addEventListener("click", (event) => {
+        if (event.target === configOverlay) {
+          closeConfigModal();
+        }
+      });
+
+      adviceList.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target.closest("[data-advice-tone]") : null;
+        if (!target) {
+          return;
+        }
+
+        setAITone(target.dataset.adviceTone || DEFAULT_AI_TONE, {
+          rerun: Boolean(window.analysisResult),
+        });
+      });
+
+      adviceList.addEventListener(
+        "wheel",
+        (event) => {
+          if (hasInnerWheelTarget(event)) {
+            event.stopPropagation();
+          }
+        },
+        { passive: true }
+      );
+
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && state.configModalOpen) {
+          closeConfigModal();
+        }
+      });
+
+      dropzone.addEventListener("click", () => {
+        fileInput.value = "";
+        fileInput.click();
+      });
+
+      pageNavLinks.forEach((link) => {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          const targetId = link.dataset.navTarget || "";
+          const target = document.getElementById(targetId);
+          if (!target) {
+            return;
+          }
+          app.scrollTo({ top: target.offsetTop, behavior: "smooth" });
+        });
+      });
+
+      app.addEventListener("wheel", handleAppWheel, { passive: false });
+      app.addEventListener("scroll", queueLandingProgress, { passive: true });
+      window.addEventListener("resize", queueLandingProgress);
+      window.addEventListener("load", queueLandingProgress);
+
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("dragging");
+      });
+
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragging");
+      });
+
+      dropzone.addEventListener("drop", async (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("dragging");
+
+        const [file] = event.dataTransfer.files || [];
+        await selectFile(file);
+      });
+
+      analyzeButton.addEventListener("click", () => {
+        handleAnalyze();
+      });
+
+      window.addEventListener("beforeunload", () => {
+        window.clearTimeout(wheelScrollUnlockTimer);
+        window.clearTimeout(eyeIntroStartTimer);
+        window.cancelAnimationFrame(eyeIntroFrame);
+        destroyFeatureRadar();
+        revokePreviewUrl();
+      });
+
+      enableSimilarDrag(similarStrip);
+      setupSectionObservers();
+      setEyeOpen(0);
+      queueLandingProgress();
+      eyeIntroStartTimer = window.setTimeout(() => {
+        animateEyeOpen(1, 700, () => {
+          eyeScrollControlEnabled = true;
+        });
+      }, 800);
+      renderAll();
+      void isBackendReachable();
+    </script>
   </body>
 </html>

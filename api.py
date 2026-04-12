@@ -227,6 +227,7 @@ async def analyze(file: UploadFile = File(...)) -> Any:
                     "rank": int(item.get("rank", index + 1)),
                     "dataset_key": str(item.get("dataset_key", "")),
                     "dataset_name": str(item.get("dataset_name", "")),
+                    "title": str(item.get("title", "")),
                     "img_name": str(item.get("img_name", "")),
                     "similarity": _to_float(item.get("similarity", 0.0)),
                     "relative_ctr": _to_float(item.get("relative_ctr", 0.0)),

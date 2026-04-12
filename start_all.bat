@@ -6,28 +6,18 @@ if /i "%~1"=="--dry-run" set "DRY_RUN=1"
 
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
-set "FRONTEND_DIR="
-
-for /d %%D in ("%ROOT%\*") do (
-  if exist "%%~fD\package.json" (
-    if exist "%%~fD\src\main.tsx" (
-      set "FRONTEND_DIR=%%~fD"
-    )
-  )
-)
+set "FRONTEND_DIR=%ROOT%\front"
+set "FRONTEND_FILE=%FRONTEND_DIR%\index.html"
+set "FRONTEND_PORT=8080"
+set "FRONTEND_URL=http://127.0.0.1:%FRONTEND_PORT%/"
 
 if not exist "%ROOT%\api.py" (
   echo [ERROR] api.py was not found in "%ROOT%".
   exit /b 1
 )
 
-if not defined FRONTEND_DIR (
-  echo [ERROR] Frontend directory was not found under "%ROOT%".
-  exit /b 1
-)
-
-if not exist "%FRONTEND_DIR%\package.json" (
-  echo [ERROR] Frontend package.json was not found in "%FRONTEND_DIR%".
+if not exist "%FRONTEND_FILE%" (
+  echo [ERROR] Frontend entry file was not found in "%FRONTEND_FILE%".
   exit /b 1
 )
 
@@ -44,20 +34,10 @@ if exist "%ROOT%\.venv\Scripts\python.exe" (
   )
 )
 
-where pnpm >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] pnpm was not found. Install it first with: npm install -g pnpm
-  exit /b 1
-)
-
-if not exist "%FRONTEND_DIR%\node_modules" (
-  echo [WARN] "%FRONTEND_DIR%\node_modules" was not found.
-  echo [WARN] Run "pnpm install" in the frontend directory before starting the UI.
-)
-
 echo [INFO] Root: "%ROOT%"
 echo [INFO] Python: "%PYTHON_EXE%"
-echo [INFO] Frontend: "%FRONTEND_DIR%"
+echo [INFO] Frontend: "%FRONTEND_FILE%"
+echo [INFO] Frontend URL: %FRONTEND_URL%
 echo.
 
 powershell -NoProfile -Command "$p = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -eq 8000 }; if ($p) { exit 0 } else { exit 1 }"
@@ -72,17 +52,22 @@ if errorlevel 1 (
   echo [INFO] Backend is already listening on port 8000. Skipping backend startup.
 )
 
-set "FRONTEND_DIR_PS=%FRONTEND_DIR%"
-powershell -NoProfile -Command "$frontend = $env:FRONTEND_DIR_PS; $p = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*vite*' -and $_.CommandLine -like ('*' + $frontend + '*') }; if ($p) { exit 0 } else { exit 1 }"
+powershell -NoProfile -Command "$p = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -eq %FRONTEND_PORT% }; if ($p) { exit 0 } else { exit 1 }"
 if errorlevel 1 (
-  echo [INFO] Starting frontend with pnpm dev ...
+  echo [INFO] Starting static frontend on %FRONTEND_URL% ...
   if defined DRY_RUN (
-    echo [DRY RUN] start "Compet Frontend" cmd /k chcp 65001 ^>nul ^&^& cd /d "%FRONTEND_DIR%" ^&^& pnpm dev
+    echo [DRY RUN] start "Compet Frontend" cmd /k chcp 65001 ^>nul ^&^& cd /d "%FRONTEND_DIR%" ^&^& set "PYTHONUTF8=1" ^&^& "%PYTHON_EXE%" -m http.server %FRONTEND_PORT% --bind 127.0.0.1
   ) else (
-    start "Compet Frontend" cmd /k chcp 65001 ^>nul ^&^& cd /d "%FRONTEND_DIR%" ^&^& pnpm dev
+    start "Compet Frontend" cmd /k chcp 65001 ^>nul ^&^& cd /d "%FRONTEND_DIR%" ^&^& set "PYTHONUTF8=1" ^&^& "%PYTHON_EXE%" -m http.server %FRONTEND_PORT% --bind 127.0.0.1
   )
 ) else (
-  echo [INFO] Frontend Vite process is already running for this project. Skipping frontend startup.
+  echo [INFO] Frontend is already listening on port %FRONTEND_PORT%. Skipping frontend startup.
+)
+
+if defined DRY_RUN (
+  echo [DRY RUN] start "" "%FRONTEND_URL%"
+) else (
+  start "" "%FRONTEND_URL%"
 )
 
 echo.

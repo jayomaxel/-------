@@ -211,6 +211,7 @@ def retrieve_similar(
 
     for rank, idx in enumerate(top_indices, start=1):
         row = dataframe.iloc[idx]
+        title = str(row.get(config.COL_TITLE, ""))
         img_name = str(row.get(config.COL_IMG_NAME, ""))
         row_dataset_key = str(row.get(DATASET_KEY_COL, ""))
         row_dataset_name = str(row.get(DATASET_NAME_COL, row_dataset_key))
@@ -227,6 +228,7 @@ def retrieve_similar(
                 "rank": rank,
                 "dataset_key": row_dataset_key,
                 "dataset_name": row_dataset_name,
+                "title": title,
                 "img_name": img_name,
                 "img_path": img_path,
                 "similarity": _round4(similarities[idx]),
